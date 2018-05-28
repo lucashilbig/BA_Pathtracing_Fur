@@ -1,0 +1,71 @@
+#include "/SimpleRaytracer/srt_input.compute"
+
+vec3 phong(const in vec3 ray_direction, const in vec3 normal, const in vec2 uv, const in vec3 shadowray_direction, const in Material material, const in vec4 lightcolor)
+{
+		
+	vec4 diffColor = getMaterialColorParam(material.diffuse, uv);
+	vec4 specColor = getMaterialColorParam(material.specular, uv);
+	float roughness = getMaterialFloatParam(material.roughness, uv);
+	float reflectivity = getMaterialFloatParam(material.reflectivity, uv);
+
+        vec3 lightdir = normalize(shadowray_direction);
+        float cos_phi = max(dot(normal, lightdir), 0.0f);
+
+        vec3 diffuse = (cos_phi * diffColor * lightcolor).xyz;
+
+        vec3 view = normalize(ray_direction);
+        vec3 reflection = normalize(reflect(lightdir, normal));
+        float cos_psi_n = pow(max(dot(reflection, view), 0.0f), 1/max(roughness,1e-3));
+        vec3 specular = (reflectivity * cos_psi_n * specColor * lightcolor).xyz;
+
+        return diffuse + specular;
+}
+
+void shade(){
+    uint x = gl_GlobalInvocationID.x;
+    uint y = gl_GlobalInvocationID.y;
+	uint linearID = pixelToLinear(x,y);
+	
+	if(x >= screen.width || y >= screen.height){
+		return;
+	}
+	
+	Intersection intersection = intersections.data[linearID];
+	Triangle triangle = triangleOf(intersection);
+	Material material = materialOf(triangle);
+	vec3 normal = fromBarycentric(intersection.barycentric, normals.data, triangle).xyz;
+	vec2 uv = fromBarycentric(intersection.barycentric, uvs.data, triangle).xy;
+	Ray primaryRay = rays.data[linearID];
+	vec3 position = fromBarycentric(intersection.barycentric, vertices.data, triangle).xyz;
+	
+    vec4 shadeColor = environment.background;
+	
+	if(intersection.barycentric.x != -1){
+		//If it is a valid hit...
+		vec4 diffColor = getMaterialColorParam(material.diffuse, uv);
+		vec3 ambient = environment.ambient.xyz * diffColor.xyz;
+	
+		//For each light...
+		for(int i=0; i<num_lights; i++){
+
+			vec3 lightPos;
+			vec3 dirToLight;
+			float attenuation;
+			vec3 light_color;
+			//TODO: Something seems weird.
+			calcLightParams(i, position, vec2(0), light_color, lightPos, dirToLight, attenuation);
+			
+			Ray shadowRay;
+			shadowRay.origin.xyz = position - debug.bias * primaryRay.direction.xyz;
+			shadowRay.direction.xyz = dirToLight;
+			
+			if(attenuation > 0.0f && !intersectsAny(shadowRay, length(lightPos.xyz - shadowRay.origin.xyz))){
+				ambient += attenuation * phong(primaryRay.direction.xyz, normal, uv, dirToLight, material, vec4(light_color, 1));
+			}
+		}
+		
+		shadeColor = vec4(ambient, 1);
+	}
+	
+	imageStore(outImage, ivec2(x,y), shadeColor);
+}

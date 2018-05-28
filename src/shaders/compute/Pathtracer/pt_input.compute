@@ -1,0 +1,81 @@
+#ifndef __PT_INPUT_COMPUTE
+#define __PT_INPUT_COMPUTE
+
+#include "include/inc_intersectionRayStructs.compute"
+#include "include/inc_camera.compute"
+#include "include/inc_meshData.compute"
+#include "include/inc_random.compute"
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Uniforms
+////////
+////////////////////////////////////////////////////////////////////
+
+layout (/*format*/ rgba8) uniform writeonly image2D outImage;
+
+uniform struct
+{
+	int random_input;
+	int random_input_2;
+	float inv_current_samples;
+	bool is_bidirectional;
+} sampling;
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Structs
+////////
+////////////////////////////////////////////////////////////////////
+
+struct IntersectionRay{
+	Ray ray;
+	Intersection intersection;
+};
+
+struct Bounce
+{
+	vec4 color;
+	vec3 light_weight;
+	int mat_flags;
+};
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Buffer
+////////
+////////////////////////////////////////////////////////////////////
+
+layout(std430) restrict buffer rayBuffer {
+	IntersectionRay data[];
+} intersectionRays;
+
+layout(std430) restrict buffer bounceBuffer
+{
+	Bounce data[];
+} bounces;
+
+const float UINT_MAX = 4294967295.0;
+
+const float RANDOM_SAMPLING_FACTOR = 100000.0;
+const float INV_RANDOM_SAMPLING_FACTOR = 1.0/100000.0;
+
+vec2 sample2DPoint(){
+	uint x = gl_GlobalInvocationID.x;
+	uint y = gl_GlobalInvocationID.y;
+	uint start = sampling.random_input * screen.width * screen.height;
+	rng_state += WangHash(start+(pixelToLinear(x, y)));
+	float rand = float(rand_xorshift()) * (1.0 / UINT_MAX);
+	return hammersley2d(uint(rand* RANDOM_SAMPLING_FACTOR), INV_RANDOM_SAMPLING_FACTOR);
+}
+
+vec2 sample2DPoint(int rnd){
+	uint x = gl_GlobalInvocationID.x;
+	uint y = gl_GlobalInvocationID.y;
+	uint start = uint(rnd) * screen.width * screen.height;
+	rng_state += WangHash(start+(pixelToLinear(x, y)));
+	float rand = float(rand_xorshift()) * (1.0 / UINT_MAX);
+	return hammersley2d(uint(rand* RANDOM_SAMPLING_FACTOR), INV_RANDOM_SAMPLING_FACTOR);
+}
+
+#endif //_PT_INPUT_COMPUTE

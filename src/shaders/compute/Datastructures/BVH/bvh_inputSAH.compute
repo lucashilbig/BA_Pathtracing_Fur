@@ -1,0 +1,92 @@
+
+const int INNER = 0;
+const int LEAF = 1;
+
+struct IDRange{
+	int start_idx, end_idx, parent_id, padding;
+};
+
+struct Node{
+	vec4 min_bound;
+	vec4 max_bound;
+	int type;
+	int left_idx;
+	int right_idx;
+	int parent;
+};
+
+struct AxisConstants{
+	float cbmin;
+	float cbmax;
+	float cbdiff;
+	float k;
+};
+
+struct Bin{
+	//array access to evaluate single axes
+	vec4 min_bound;
+	vec4 max_bound;
+	int num_obj;
+	int pad0, pad1, pad2;
+};
+
+struct cent_box{
+	vec4 bounds[2]; // min and max bounds
+};
+
+
+
+layout(std430) restrict buffer counterBuffer {
+	int kernel;
+	int bufferPos;
+	int node;
+	int leaf;
+} counter;
+	
+layout(std430) restrict readonly buffer vertexBuffer {
+	vec4 data[];
+} vertices;
+
+layout(std430) restrict buffer indexBuffer {
+	Triangle data[];
+} triangles;
+
+layout(std430) restrict buffer IDRangeBuffer {
+	IDRange data[];
+} id_range;
+
+layout(std430) restrict buffer tmpIDRangeBuffer {
+	IDRange data[];
+} id_range_tmp;
+
+layout(std430) restrict buffer nodeBuffer {
+	Node data[];
+} nodes;
+
+layout(std430) restrict buffer cbBuffer {
+	cent_box data[];
+} cb;
+
+layout(std430) restrict buffer centBuffer {
+	vec4 data[];
+} triangle_centroids;
+
+layout(std430) restrict buffer tmpCbBuffer {
+	cent_box data[];
+} cb_tmp;
+
+// layout(std430) restrict readonly buffer lightBuffer {
+	// Light data[];
+// } lights;
+
+layout(std430) restrict readonly buffer normalBuffer {
+	vec4 data[];
+} normals;
+
+layout(std430) restrict readonly buffer uvBuffer {
+	vec2 data[];
+} uvs;
+
+layout(std430) restrict readonly buffer materialBuffer {
+	Material data[];
+} materials;

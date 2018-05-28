@@ -1,0 +1,20 @@
+#include "/SimpleRaytracer/srt_input.compute"
+
+void trace()
+{
+   uint x = gl_GlobalInvocationID.x;
+    uint y = gl_GlobalInvocationID.y;
+	
+	if(x >= screen.width || y >= screen.height){
+		return;
+	}
+
+    Ray ray = rays.data[pixelToLinear(x,y)];
+    Intersection hit;
+
+	if (!nearestIntersection(ray, hit))
+	{
+		hit.barycentric.x = -1;
+	}
+	intersections.data[pixelToLinear(x,y)] = hit;
+}

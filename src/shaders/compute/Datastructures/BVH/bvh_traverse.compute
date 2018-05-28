@@ -1,0 +1,134 @@
+#include "/Datastructures/BVH/bvh_input.compute"
+#include "/include/inc_intersectionRayFuncs.compute"
+
+void getBB(const in int id, inout vec4 min_bound, inout vec4 max_bound)
+{
+	min_bound = nodes.data[id].min_bound;
+	max_bound = nodes.data[id].max_bound;
+}
+
+//"Stackless" BVH-Traversal.
+// See https://pdfs.semanticscholar.org/7e81/6b82fb92df08d7bc0d9805f8988754e0d8c1.pdf
+bool traverse(const in Ray ray, inout Intersection hit, const in bool nearest_only, const in float max_distance)
+{
+	float t = 0;
+	float t_min = FLT_MAX;
+
+	vec4 min_bound, max_bound;
+
+	// Check once the AABB for the whole scene
+	getBB(0, min_bound, max_bound);
+	bool hit_scene = intersectAABB(ray, min_bound, max_bound);
+	bool hit_triangle = false;
+
+	int current_node = 0;
+	int bitstack = 0;
+
+	//if (hit_scene){
+	while (hit_scene)
+	{
+		if (nodes.data[current_node].type == INNER)
+		{
+			int id_left = nodes.data[current_node].left_idx;
+			getBB(id_left, min_bound, max_bound);
+			bool hit_left = intersectAABB(ray, min_bound, max_bound);
+
+			int id_right = nodes.data[current_node].right_idx;
+			getBB(id_right, min_bound, max_bound);
+			bool hit_right = intersectAABB(ray, min_bound, max_bound);
+
+
+			//both hit
+			if (hit_left && hit_right)
+			{
+				// shift bitstack and mark as branched, so we can use the marker 
+				// when backtracking to stop here and use the right child.
+				bitstack = bitstack << 1;
+				current_node = id_left;
+				bitstack = bitstack | 1;
+				continue;
+			}
+			// only left hit
+			else if (hit_left && !hit_right)
+			{
+				// Not branching here, the other sibling-check won't be needed here.
+				bitstack = bitstack << 1;
+				current_node = id_left;
+				continue;
+			}
+			// only right hit
+			else if (!hit_left && hit_right)
+			{
+				// Not branching here, the other sibling-check won't be needed here.
+				bitstack = bitstack << 1;
+				current_node = id_right;
+				continue;
+			}
+		}
+		else
+		{
+			//Is leaf
+			// intersect ray with primitives.
+			//shorten ray if closer intersection found.
+			//intersect triangles
+			Triangle tri;
+
+			int start = nodes.data[current_node].left_idx;
+			int end = nodes.data[current_node].right_idx;
+			float u, v;
+			for (uint i = start; i <= end; i++)
+			{
+				if (intersectTriangle(ray, triangles.data[i], t, u, v))
+				{
+					if (t < t_min && t < max_distance) //test for ray_length
+					{
+						t_min = t;
+						hit_triangle = true;
+
+						//TODO: Hitparameter must be filled with information according to the ray-flag information
+						if (nearest_only)
+						{
+							return true;
+						}
+
+						hit.barycentric = vec3(u, v, 1 - u - v);
+						hit.triangle_index = i;
+					}
+
+				}
+
+			}
+
+		}
+
+		//Backtrace on bitstack until we find a branching point (where bit value is 1)
+		while ((bitstack & 1) == 0)
+		{
+			//Empty bitstack
+			if (bitstack == 0)
+			{
+				return hit_triangle;
+			}
+
+			current_node = nodes.data[current_node].parent;
+			bitstack = bitstack >> 1;
+		}
+
+		//Use other (right) sibling from the left child of the branched tree node.
+		current_node = nodes.data[nodes.data[current_node].parent].right_idx;
+		bitstack = bitstack ^ 1;
+	}
+
+	return hit_triangle;
+}
+
+bool nearestIntersection(const in Ray ray, inout Intersection hit)
+{
+	return traverse(ray, hit, false, FLT_MAX);
+}
+
+bool intersectsAny(const in Ray ray, const in float max_distance)
+{
+	Intersection unused_hit;
+	return traverse(ray, unused_hit, true, max_distance);
+}

@@ -1,0 +1,18 @@
+
+vec3 localSample(const in Intersection hit, const in vec3 local_input_ray, const in vec3 normal, const in vec2 sampling, inout vec3 local_output_ray, inout float output_pdf, inout int mat_flags)
+{
+	//Won't be needed.
+	local_output_ray = vec3(0);
+
+	//Make this hit emissive.
+	mat_flags = MATFLAG_EMISSIVE_BOUNCE;
+
+	//Set those to a length value !=0, so the result won't be discarded by the pathtracer shading function.
+	output_pdf = 1.f;
+	return vec3(1);
+}
+
+vec3 evaluateLight(const in Intersection intersection, const in vec3 local_input_ray, const in vec3 local_output_ray)
+{
+	return vec3(0);
+}

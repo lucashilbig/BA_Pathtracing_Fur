@@ -1,0 +1,1 @@
+[contibution-guide im wiki](https://gitlab.uni-koblenz.de/KIRK/RT/wikis/contr-guide)

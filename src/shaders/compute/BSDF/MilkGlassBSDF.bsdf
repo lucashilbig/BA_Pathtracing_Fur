@@ -1,0 +1,117 @@
+/*
+How does a GlassBSDF work?
+
+Zuerst, nachdem benötigte Parameter festgelegt wurden, welche in dem Fall lediglich die lokale normale (mit z-up) und die Texturkoordinate sind, werden folgende Parameter gesetzt:
+1. entering - Sagt aus, ob der Stahl in ein Objekt ein- oder austritt, sprich, ob der Eintrittswinkel größer als 90° ist.
+2. eta_i, eta_t - IOR des Materials, aus dem der Strahl kommt, respektive dessen in das der Strahl eindringt. Dies wird anhand des entering-Werts gesetzt. (im Folgenden als eingehender bzw. ausgehender IOR bezeichnet)
+3. fresnel - Der dielektrische Fresnel Wert des eingehenden Strahls. Dieser Wert liegt zwischen 0 und 1 und repräsentiert Physikalisch approximiert die Reflektivität des Materials abhändig vom Winkel zwischen dem umgedrehten eingehenden Strahl und der Oberflächennormalen. Je flacher ein Strahl auftrifft, desto höher ist dieser Wert.
+
+Anschließend wird der gebrochene (ausgehende) Strahl durch refract(...) berechnet. Dabei wird der normalisierte wirkliche eingehende Strahl (wirklich, da der eingabeparameter den vorab umgedrehten Strahl angibt) an der zur Strahlrichtung gedrehten Normale gebrochen. Hier muss dann funktionsabhängig auch der Quotient aus eingehendem und ausgehendem IOR verwendet werden.
+
+
+Die PDF und der ausgehende Strahl:
+
+Nun kommt es zur Fallunterscheidung zweier allgemeiner Fälle, die sich aus dem Ergebnis der refract Funktion ergeben:
+1) Der ausgehende Strahl ist ein Nullvektor. Dies tritt allein in dem Fall auf, dass der eingehende Strahl sehr flach auf die Oberfläche auftrifft und er deshalb aufgrund des physikalischen Verhaltens von Licht an Grenzbereichen zweier nicht-absorbierender Materialien eine Totalreflektion erzeugt. Dann wird direkt zur Reflektion übergegangen (im Folgenden erklärt).
+2) In allen anderen Fällen fand eine Brechung statt. Um physikalisch korrekt zu bleiben, hat jeder Strahl abstrakt gesehen einen Blickwinkel-abhändigen Anteil an Brechung und Reflektion. Dieser wird hier durch den Fresnel wie oben beschrieben Wiedergegeben. Da nur immer ein Strahl betrachtet wird, wird dieser anhand dessen Gewichtet. Dabei wird der Fresnel Wert als Wahrscheinlichkeit dessen betrachtet, dass der Strahl ein gebrochener ist.
+
+Die Wahrscheinlichkeitsbetrachtung aus Fall 2 erfolgt durch Vergleich mit dem uniform-Verteilten zufälligen sample parameter. Ist der Fresnel-Wert kleiner, sprich, traf der Stahl eher senkrechter auf die Oberfläche auf, wird gebrochen, andernfalls reflektiert.
+
+-> Bei der Brechung wird letztenendes die ausgehende PDF auf 1-fresnel gesetzt. Das bedeutet, dass die Wahrscheinlichkeit für den ausgehenden Strahl höher ist, umso senkrechter der eingehende Strahl auftraf.
+-> Bei der Reflektion wird die PDF auf den Fresnel-Wert gesetzt. Je flacher der Strahl also auftrifft, desto stärker wird reflektiert. Der reflektierte Strahl wird wie der gebrochene aus der normalisierten wirklichen Strahlrichtung und der zu dieser nach vorne gedrehten normale reflektiert.
+
+In beiden Fällen wird auch der ausgehende Farbanteil (?) nochmals mit dem Fresnel-Wert gewichtet.
+*/
+
+#ifndef FRESNEL
+#define FRESNEL
+float dialectricFresnel(const in float cos_theta, in float eta_i, in float eta_t){
+    float cos_theta_i = clamp ( cos_theta, -1.f, 1.f );
+
+    // If we are not entering, we have to swap the indices of refraction:
+    if ( cos_theta_i <= 0 ) {
+        float tmp = eta_i;
+        eta_i = eta_t;
+        eta_t = tmp;
+        cos_theta_i = abs(cos_theta_i);
+    }
+
+    // Snell's law
+    float sin_theta_i = sqrt(max(0.f, 1 - cos_theta_i * cos_theta_i));
+    float sin_theta_t = eta_i / eta_t * sin_theta_i;
+
+    if (sin_theta_t >= 1) {
+        return 1;
+    }
+
+    float cos_theta_t = sqrt(max(0.f, 1 - sin_theta_t * sin_theta_t));
+
+    float rparl = ((eta_t * cos_theta_i) - (eta_i * cos_theta_t)) /
+                  ((eta_t * cos_theta_i) + (eta_i * cos_theta_t));
+    float rperp = ((eta_i * cos_theta_i) - (eta_t * cos_theta_t)) /
+                  ((eta_i * cos_theta_i) + (eta_t * cos_theta_t));
+
+    // Valid only for unpolarised light, which is what we assume here.
+    return ( rparl * rparl + rperp * rperp) / 2;
+}
+#endif
+
+vec3 localSample(const in Intersection hit, const in vec3 local_input_ray, const in vec3 normal, const in vec2 sampling, inout vec3 local_output_ray, inout float output_pdf, inout int mat_flags)
+{	
+	//Triangle Data
+	Triangle tri = triangleOf(hit);
+	Material material = materialOf(tri);
+	vec2 uv = fromBarycentric(hit.barycentric, uvs.data, tri);
+
+	//Needed parameters for refraction and reflection
+	bool entering = dot(local_input_ray, normal) > 0.f;
+	float eta_i = entering ? 1.f : material.ior;
+	float eta_t = entering ? material.ior : 1.f;
+	float fresnel = dialectricFresnel(abs(dot(local_input_ray, normal)), eta_i, eta_t);
+
+	mat_flags |= MATFLAG_SPECULAR_BOUNCE;
+
+	//refract ray.
+	vec3 refracted = refract(-local_input_ray, faceforward(normal, -local_input_ray, normal), eta_i / eta_t);
+
+	// Choose whether to sample refractive or reflective BSDF
+	if((refracted != vec3(0)) && (sampling.x > fresnel) && (!isnan(refracted.x)))
+	{
+		float rad = radians(180.0f - (1.0f - getMaterialFloatParam(material.roughness, uv)) * 180.0f);
+		vec3 sampledPoint = sampleAngle(sampling.x, sampling.y, rad);
+		
+		local_output_ray = localToWorldNormal(sampledPoint, refracted);
+		
+		if(dot(local_output_ray, faceforward(normal, -local_input_ray, normal)) > 0.0f)
+		{
+			local_output_ray = localToWorldNormal(sampledPoint * vec3(-1, -1, 1), refracted);
+		}
+		mat_flags |= MATFLAG_TRANSPARENT_BOUNCE;
+
+		output_pdf = 1.0f - fresnel;
+		vec3 ft = getMaterialColorParam(material.volume, uv).xyz * (1.0f - fresnel);
+
+		//if ( Transport Mode ist RADIANCE, nicht IMPORTANCE ) {
+			ft *= ( eta_i * eta_i ) / ( eta_t * eta_t );
+		//}
+
+		return ft / abs(dot(local_output_ray, normal));
+	}
+	float rad = radians(180.0f - (1.0f - getMaterialFloatParam(material.roughness, uv)) * 180.0f);
+	vec3 reflected = reflect(-local_input_ray, faceforward(normal, -local_input_ray, normal));
+	vec3 sampledPoint = sampleAngle(sampling.x, sampling.y, rad);
+	
+	local_output_ray = localToWorldNormal(sampledPoint, reflected);
+	
+	if(dot(local_output_ray, faceforward(normal, -local_input_ray, normal)) < 0.0f)
+	{
+		local_output_ray = localToWorldNormal(sampledPoint * vec3(-1, -1, 1), reflected);
+	}
+    output_pdf = fresnel;
+    return fresnel * getMaterialColorParam(material.specular, uv).xyz / abs(dot(local_output_ray, normal));
+}
+
+vec3 evaluateLight(const in Intersection intersection, const in vec3 local_input_ray, const in vec3 local_output_ray)
+{
+	return vec3(0.0f);
+}

@@ -1,0 +1,143 @@
+#ifndef __CAMERA_COMPUTE
+#define __CAMERA_COMPUTE
+
+#include "include/inc_debug.compute"
+
+#include "include/inc_intersectionRayStructs.compute"
+
+//Camera
+//This include will add functionality by adding a camera which can be used to cast rays.
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Structs and uniforms
+////////
+////////////////////////////////////////////////////////////////////
+
+//The camera parameters should be pre-calculated in C++
+//SizeOf: 48B
+uniform struct {
+	vec3 position;
+	vec3 bottom_left;
+	vec3 axis_x_scaled; //x axis in camera coords, scaled by pixel_size;
+	vec3 axis_y_scaled; //y axis in camera coords, scaled by pixel_size;
+} active_camera;
+
+//SizeOf: 8B
+uniform struct
+{
+	int width;
+	int height;
+} screen;
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Helper defines
+////////	Defines have no overhead at all at runtime.
+////////
+////////////////////////////////////////////////////////////////////
+
+#define pixelToLinear(x,y) screen.width*y+x 
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Helper functions
+////////
+////////////////////////////////////////////////////////////////////
+
+bool intersectPlane(const in Ray ray, const in vec3 v1, const in vec3 v2, const in vec3 v3, inout float t, inout float u, inout float v)
+{
+	float EPSILON = FLT_EPSILON;
+
+	vec3 e1, e2;  //Edge1, Edge2
+	vec3 P, Q, T;
+
+	float det, inv_det;
+
+	//Find vectors for two edges sharing V1
+	e1 = v2 - v1;
+	e2 = v3 - v1;
+
+	//Begin calculating determinant - also used to calculate u parameter
+	P = cross(ray.direction.xyz, e2);
+
+	//if determinant is near zero, ray lies in plane of triangle
+	det = dot(e1, P);
+	//NOT CULLING
+	if (det > -EPSILON && det < EPSILON)
+		return false;
+	inv_det = 1.f / det;
+
+	//calculate distance from V1 to ray origin
+	T = ray.origin.xyz - v1;
+
+	//Calculate u parameter and test bound
+	u = dot(T, P) * inv_det;
+
+	//The intersection lies outside of the triangle
+	if (u < 0.f || u > 1.f) return false;
+
+	//Prepare to test v parameter
+	Q = cross(T, e1);
+
+	//Calculate V parameter and test bound
+	v = dot(ray.direction.xyz, Q) * inv_det;
+	//The intersection lies outside of the triangle
+	if (v < 0.f || v  > 1.f) return false;
+
+	t = dot(e2, Q) * inv_det;
+
+	if (t > EPSILON) { //ray intersection
+		return true;
+	}
+
+	// No hit, no win
+	return false;
+}
+
+// Determines, whether a world position point is inside the camera view frustum (or can be mapped to the camera view plane).
+// For that, an intersection test is being made between the view plane and a ray from world_position to the camera's position.
+// pixel will be a vec4 containing the integer pixel coordinates in xy and the subpixel offset in zw.
+// visibility_test will be the ray between world_position and camera position.
+// t is the distance from world position to the camera plane.
+bool visibleFromPosition(const in vec3 world_position, const in vec3 normal, inout vec4 pixel, inout Ray visibility_test, inout float t)
+{
+	float pixel_size = length(active_camera.axis_x_scaled);
+
+	vec3 abs_bottom_left = active_camera.bottom_left;
+	vec3 abs_bottom_right = abs_bottom_left + screen.width * active_camera.axis_x_scaled;
+	vec3 abs_top_left = abs_bottom_left + screen.height * active_camera.axis_y_scaled;
+
+	float u, v;
+
+	visibility_test.direction = vec4(normalize(active_camera.position - world_position), 0);
+	visibility_test.origin = vec4(world_position + 1e-4*normal, 1);
+
+	if (intersectPlane(visibility_test, abs_bottom_left, abs_bottom_right, abs_top_left, t, u, v)) {
+		//u, v are texcoords, length(axis_x_scaled) is pixel size.
+
+		vec2 unseparated_px = vec2(u * float(screen.width), v * float(screen.height));
+
+		pixel.x = int(floor(unseparated_px.x));
+		pixel.y = int(floor(unseparated_px.y));
+		pixel.z = unseparated_px.x - pixel.x;
+		pixel.w = unseparated_px.y - pixel.y;
+
+		return true;
+	}
+
+	return false; //TODO: not implemented
+}
+
+Ray shootRay(const in uint x, const in uint y, const in float subpixel_delta_x, const in float subpixel_delta_y) {
+	Ray ray;
+	ray.origin = vec4(active_camera.position, 1);
+	ray.direction = vec4(active_camera.bottom_left + 
+			(x + subpixel_delta_x) * active_camera.axis_x_scaled + 
+			(y + subpixel_delta_y) * active_camera.axis_y_scaled - 
+			active_camera.position, 0);
+	ray.pixel = ivec2(x, y);
+	return ray;
+}
+
+#endif //__CAMERA_COMPUTE

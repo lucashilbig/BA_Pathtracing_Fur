@@ -1,0 +1,85 @@
+#ifndef __DEBUG_COMPUTE
+#define __DEBUG_COMPUTE
+
+
+uniform struct
+{
+	float bias;
+	float min_pdf;
+	float bounce_bias;
+	float bounce;
+	uint invocation_count;
+	int current_bounce;
+} debug;
+
+uniform struct
+{
+	vec4 background;
+	vec4 ambient;
+	sampler2D cubeMap[6];
+	sampler2D sphereMap;
+
+	uint type;
+	uint hasCubeMap;
+	uint hasSphereMap;
+	uint padding;
+} environment;
+
+#define ENV_COLOR 0
+#define ENV_CUBE_MAP 1
+#define ENV_SPHERE_MAP 2
+
+vec4 sampleEnvironment(const in vec3 ray_direction)
+{
+	vec3 direction = normalize(ray_direction);
+
+	switch (environment.type)
+	{
+	case ENV_CUBE_MAP:
+	{
+		vec3 signs = vec3(sign(direction.x), sign(direction.y), sign(direction.z));
+		vec3 absolutes = vec3(abs(direction.x), abs(direction.y), abs(direction.z));
+		float maxval = max(absolutes.x, max(absolutes.y, absolutes.z));
+
+		int side;
+		vec2 uv;
+
+		if (maxval == absolutes.x)
+		{
+			//Take either right or left map
+			side = int(0 + 1.5f - 1.5f * signs.x);
+			uv = vec2((direction.z / direction.x + 1) / 2, (direction.y / absolutes.x + 1) / 2);
+		}
+		else if (maxval == absolutes.y)
+		{
+			//Take either top or bottom map
+			side = int(1 + 1.5f - 1.5f * signs.y);
+			uv = vec2((direction.x / absolutes.y + 1) / 2, (direction.z / direction.y + 1) / 2);
+		}
+		else
+		{
+			//Take either front or back map
+			side = int(2 + 1.5f + 1.5f * signs.z);
+			uv = vec2(-(direction.x / direction.z + 1) / 2 + 1, (direction.y / absolutes.z + 1) / 2);
+		}
+
+		uv = min(uv, vec2(1 - 1e-3));
+		uv = max(uv, vec2(1e-3));
+
+		return texture(environment.cubeMap[side], uv);
+	}
+	case ENV_SPHERE_MAP:
+	{
+		float m = 2.0 * sqrt(direction.x*direction.x + direction.y*direction.y + (direction.z + 1.0)*(direction.z + 1.0));
+		vec2 uv;
+		uv.x = direction.x / m + 0.5;
+		uv.y = direction.y / m + 0.5;
+		return texture(environment.sphereMap, uv);
+	}
+	case ENV_COLOR:
+		return environment.background;
+	}
+	return environment.background;
+}
+
+#endif //__DEBUG_COMPUTE

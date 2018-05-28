@@ -1,0 +1,70 @@
+#ifndef __PT_TRACE_COMPUTE
+#define __PT_TRACE_COMPUTE
+//
+//#ifndef PPRIMARY
+//#define PPRIMARY
+//uniform bool is_primary;
+//#endif //!PPRIMARY
+
+#include "Pathtracer/pt_input.compute"
+//#include "Pathtracer/bsdf_base.compute"
+
+// is_primary is moved to inc_light.compute...
+//uniform bool is_primary;
+
+void trace()
+{
+    uint x = gl_GlobalInvocationID.x;
+	
+	if(x >= debug.invocation_count){
+		return;
+	}
+
+    Ray ray = intersectionRays.data[x].ray;
+    Intersection hit = intersectionRays.data[x].intersection;
+	hit.pixel = ray.pixel;
+	
+	if(dot(ray.direction, ray.direction) == 0.0f || hit.barycentric.x == -1){
+		intersectionRays.data[x].intersection.barycentric.x = -1;
+		return;
+	}
+	bool is_intersection = nearestIntersection(ray, hit);
+	// Intersect Lights
+	float t_geom = 1.0/0.0;
+	if(is_intersection)
+	{
+		Triangle tri = triangleOf(hit);
+		vec3 pos = fromBarycentric(hit.barycentric, vertices.data, tri).xyz;
+		float dist = length(vec3(ray.origin) - pos);
+		t_geom = dist / length(ray.direction);
+	}
+	bool light_intersection = false;
+	float t_lights = 1.0/0.0;
+	int t_index = -1;
+	for(int i = 0; i < num_lights; i++)
+	{
+		float t = 1.0/0.0;
+		bool intsect = intersectLight(ray, i, t);
+		light_intersection = light_intersection || intsect;
+		if(intsect)
+		{
+			t_lights = min(t_lights, t);
+			t_index = t == t_lights ? i : t_index;
+		}
+	}
+	is_intersection = is_intersection || light_intersection;
+	if(t_lights < t_geom)
+	{
+		hit.barycentric.x = -2;
+		hit.barycentric.y = t_index;
+		hit.t = t_lights;
+	}
+	if (!is_intersection)
+	{
+		hit.barycentric.x = -1;
+	}
+	
+	intersectionRays.data[x].intersection = hit;
+}
+
+#endif //__PT_TRACE_COMPUTE

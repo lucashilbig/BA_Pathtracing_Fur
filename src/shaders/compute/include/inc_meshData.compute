@@ -1,0 +1,87 @@
+#ifndef __MESH_DATA_COMPUTE
+#define __MESH_DATA_COMPUTE
+
+//MeshData
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Structs
+////////
+////////////////////////////////////////////////////////////////////
+
+uniform int num_lights;
+
+struct Light
+{
+	vec4 position;
+	vec4 color;
+};
+
+struct Mesh 
+{
+	uint num_vertices;
+	uint num_triangles;
+	float aabb[6];		//Axis aligned bounding box
+};
+
+struct Triangle 
+{
+	//Triangle indices
+    uint i0;
+	uint i1;
+	uint i2;
+	
+	//Triangle material index
+    uint mat_id;
+};
+
+#extension GL_ARB_bindless_texture : require
+
+struct MaterialUnitColorRGBA
+{
+	vec4 base;
+	uint has_texture;
+
+	//
+	uint padding;
+	sampler2D textureSampler;
+};
+
+struct MaterialUnitFloat
+{
+	float base;
+	uint has_texture;
+	sampler2D textureSampler;
+};
+
+struct Material
+{
+	MaterialUnitColorRGBA diffuse;
+	MaterialUnitColorRGBA specular;
+	MaterialUnitColorRGBA volume;
+	MaterialUnitColorRGBA emission;
+	MaterialUnitColorRGBA normal;
+
+	MaterialUnitFloat transparency;
+	MaterialUnitFloat reflectivity;
+	MaterialUnitFloat roughness;
+	MaterialUnitFloat bump;
+
+	float ior;
+	uint bsdf_id;
+};
+
+#define getMaterialColorParam(matParam, texCoord) (matParam.has_texture==1 ? texture(matParam.textureSampler, texCoord) : matParam.base)
+#define getMaterialFloatParam(matParam, texCoord) (matParam.has_texture==1 ? length(texture(matParam.textureSampler, texCoord)) : matParam.base)
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Structs
+////////
+////////////////////////////////////////////////////////////////////
+
+vec3 flipToView(const in vec3 direction, const in vec3 normal){
+	return dot(direction, normal) <= 0.f ? normal : -normal;
+}
+
+#endif //__MESH_DATA_COMPUTE

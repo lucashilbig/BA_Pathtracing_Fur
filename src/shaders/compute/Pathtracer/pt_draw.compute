@@ -1,0 +1,23 @@
+#ifndef __PT_DRAW_COMPUTE
+#define __PT_DRAW_COMPUTE
+
+uniform int valid_hits;
+
+//Copies the bounce colors to the output texture.
+void draw()
+{
+	uint x = gl_GlobalInvocationID.x;
+	uint y = gl_GlobalInvocationID.y;
+	uint linearID = pixelToLinear(x, y);
+	
+	if(x >= screen.width || y >= screen.height){
+		return;
+	}
+	
+	// ivec2 pixel = intersectionRays.data[linearID].ray.pixel;
+	// uint linearIDx = pixelToLinear(pixel.x, pixel.y);
+	
+	imageStore(outImage, ivec2(x,y), vec4(bounces.data[linearID].color.xyz*sampling.inv_current_samples, 1));
+}
+
+#endif //__PT_DRAW_COMPUTE

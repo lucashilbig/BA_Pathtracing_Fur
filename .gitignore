@@ -1,0 +1,17 @@
+BUILD_*
+resources/*
+scenes/*
+screenshots/*
+logs/*
+build*
+src/CMakeLists.txt.user
+src/.vs
+CLI_RT
+Xcode_RT
+src/.idea/
+dependencies
+src-build/
+src/.vs
+.vs
+src/shaders/SHADER.compute
+src/shaders/compute/Pathtracer/bsdf_base.compute

@@ -1,0 +1,17 @@
+#include "/SimpleRaytracer/srt_input.compute"
+#include "include/inc_camera.compute"
+
+void generatePrimaries()
+{
+    uint x = gl_GlobalInvocationID.x;
+    uint y = gl_GlobalInvocationID.y;
+	uint linearID = pixelToLinear(x,y);
+	if(x >= screen.width || y >= screen.height){
+		return;
+	}
+	vec2 points = vec2(1);
+	
+	Ray ray = shootRay(x, y, points.x, points.y);
+	
+	rays.data[linearID] = ray;
+}

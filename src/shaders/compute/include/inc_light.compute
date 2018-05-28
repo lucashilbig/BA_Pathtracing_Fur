@@ -1,0 +1,536 @@
+#ifndef __INC_LIGHT_COMPUTE
+#define __INC_LIGHT_COMPUTE
+
+#include "include/inc_random.compute"
+#include "include/inc_meshData.compute"
+
+#define LIGHT_POINT 0
+#define LIGHT_SPOT 1
+#define LIGHT_QUAD 2
+#define LIGHT_SUN 3
+
+struct RawLight
+{
+	float data[22];
+};
+
+struct PointLight
+{
+	vec4 color; //color.a won't do any good and will be used to determine the light source type.
+	vec4 position;
+	float radius;
+	float attenuation_linear;
+	float attenuation_quadratic;
+	float constant;
+};
+
+struct SunLight
+{
+	vec4 color; //color.a won't do any good and will be used to determine the light source type.
+	vec3 direction;
+	float radius;
+};
+
+struct SpotLight
+{
+	vec4 color; //color.a won't do any good and will be used to determine the light source type.
+	vec3 position;
+	vec3 direction;
+	float angle_inner;
+	float angle_outer;
+	float radius;
+	float attenuation_linear;
+	float attenuation_quadratic;
+	float constant;
+};
+
+struct QuadLight
+{
+	vec4 color; //color.a won't do any good and will be used to determine the light source type.
+	vec3 direction;
+	vec3 v0;
+	vec3 v1;
+	vec3 v2;
+	vec3 v3;
+	float attenuation_linear;
+	float attenuation_quadratic;
+	float constant;
+};
+
+//uniform uint num_lights;
+
+ layout(std430) restrict readonly buffer lightBuffer {
+	RawLight data[];
+ } lights;
+
+PointLight toPoint(const in RawLight raw) {
+	PointLight point;
+
+	point.color = vec4(raw.data[0], raw.data[1], raw.data[2], raw.data[3]);
+	point.position = vec4(raw.data[4], raw.data[5], raw.data[6], raw.data[7]);
+
+	point.radius = raw.data[8];
+	point.attenuation_linear = raw.data[9];
+	point.attenuation_quadratic = raw.data[10];
+	point.constant = raw.data[11];
+
+	return point;
+}
+
+SunLight toSun(const in RawLight raw) {
+	SunLight sun;
+
+	sun.color = vec4(raw.data[0], raw.data[1], raw.data[2], raw.data[3]);
+	sun.direction = vec3(raw.data[4], raw.data[5], raw.data[6]);
+
+	sun.radius = raw.data[7];
+
+	return sun;
+}
+
+SpotLight toSpot(const in RawLight raw) {
+	SpotLight spot;
+
+	spot.color = vec4(raw.data[0], raw.data[1], raw.data[2], raw.data[3]);
+	spot.position = vec3(raw.data[4], raw.data[5], raw.data[6]);
+	spot.direction = vec3(raw.data[7], raw.data[8], raw.data[9]);
+
+	spot.angle_inner = raw.data[10];
+	spot.angle_outer = raw.data[11];
+
+	spot.radius = raw.data[12];
+
+	spot.attenuation_linear = raw.data[13];
+	spot.attenuation_quadratic = raw.data[14];
+	spot.constant = raw.data[15];
+
+	return spot;
+}
+
+QuadLight toQuad(const in RawLight raw) {
+	QuadLight quad;
+
+	quad.color = vec4(raw.data[0], raw.data[1], raw.data[2], raw.data[3]);
+	quad.direction = vec3(raw.data[4], raw.data[5], raw.data[6]);
+	quad.v0 = vec3(raw.data[7], raw.data[8], raw.data[9]);
+	quad.v1 = vec3(raw.data[10], raw.data[11], raw.data[12]);
+	quad.v2 = vec3(raw.data[13], raw.data[14], raw.data[15]);
+	quad.v3 = vec3(raw.data[16], raw.data[17], raw.data[18]);
+
+	quad.attenuation_linear = raw.data[19];
+	quad.attenuation_quadratic = raw.data[20];
+	quad.constant = raw.data[21];
+
+	return quad;
+}
+
+void calcLightDirPoint(const in PointLight light, const in vec3 hitPosition, const in vec2 randomSample, inout vec3 color, inout vec3 position, inout vec3 direction, inout float attenuation) {
+
+	position = light.position.xyz;
+
+	vec3 point1 = uniformSphereSample(randomSample.x, randomSample.y);
+
+	position += point1 * light.radius;
+		
+	direction = normalize(position - hitPosition);
+	color.rgb = light.color.rgb;
+
+	float dist = length(position - hitPosition);
+	float dirDotDir = clamp(dot(point1, -direction), 0, 1);
+	
+	float dist_att = (light.constant + light.attenuation_linear * dist + light.attenuation_quadratic * dist * dist);
+	dist_att = dist_att == 0 ? 1 : dist_att;
+	
+	attenuation = dirDotDir / dist_att;
+}
+
+void calcLightDirSun(const in SunLight light, const in vec3 hitPosition, const in vec2 randomSample, inout vec3 color, inout vec3 position, inout vec3 direction, inout float attenuation)
+{
+	vec3 point1 = uniformSphereSample(randomSample.x, randomSample.y);
+	
+	vec3 temp_position = -light.direction;
+	temp_position.x += point1.x * light.radius;
+	temp_position.y += point1.y * light.radius;
+	temp_position.z += point1.z * light.radius;
+	
+	direction = normalize(temp_position);
+	
+	position = 1e16*direction;
+	
+	direction = position - hitPosition;
+
+	color = light.color.rgb;
+	attenuation = 1;
+}
+
+void calcLightDirSpot(const in SpotLight light, const in vec3 hitPosition, const in vec2 randomSample, inout vec3 color, inout vec3 position, inout vec3 direction, inout float attenuation) 
+{
+	//random variables
+	vec3 point = sampleDisk(randomSample.x, randomSample.y, light.direction, light.radius);
+	
+	point += light.position.xyz;
+	
+	position = point;
+
+	direction = normalize(point - hitPosition);
+
+	//Calculation of the attenuation depending on the spot angles.
+	float lightToSurfaceAngle = degrees(acos(dot(-direction, light.direction)));
+	float dist = length(position - hitPosition);
+	float delta = 1 - clamp((lightToSurfaceAngle - light.angle_inner) / ((light.angle_outer - light.angle_inner)), 0.f, 1.f);
+	delta = delta * delta * delta * delta;
+	
+	float dist_att = (light.constant + light.attenuation_linear * dist + light.attenuation_quadratic * dist * dist);
+	dist_att = dist_att == 0 ? 1 : dist_att;
+	
+	attenuation = delta / dist_att;
+
+	color = light.color.rgb;
+}
+
+void calcLightDirQuad(const in QuadLight light, const in vec3 hitPosition, const in vec2 randomSample, inout vec3 color, inout vec3 position, inout vec3 direction, inout float attenuation)
+{
+	vec3 x1 = light.v0 + randomSample.x * (light.v1 - light.v0);
+	vec3 x2 = light.v3 + randomSample.x * (light.v2 - light.v3);
+	position = x1 + randomSample.y * (x2 - x1);
+
+	direction = normalize(position - hitPosition);
+	color = light.color.rgb;
+
+	float dist = length(position - hitPosition);
+	float dirDotDir = clamp(dot(normalize(-direction), light.direction.xyz), 0, 1);
+	float dist_att = light.constant + light.attenuation_linear * dist + light.attenuation_quadratic * dist * dist;
+	attenuation = dirDotDir / dist_att;
+}
+
+// The following angular functions are for BDPT and thus might be wrong because BDPT is experimental and not working as it should
+float angularAttenuationPoint(const in PointLight light, const in vec3 direction) {
+	return 1;
+}
+float angularAttenuationSpot(const in SpotLight light, const in vec3 direction) {
+	float lightToSurfaceAngle = degrees(acos(dot(normalize(-direction), light.direction)));
+	return 1 - clamp((lightToSurfaceAngle - light.angle_inner) / ((light.angle_outer - light.angle_inner)), 0.f, 1.f);
+}
+float angularAttenuationQuad(const in QuadLight light, const in vec3 direction) {
+	return dot(normalize(-direction), light.direction.xyz);
+}
+float angularAttenuationSun(const in SunLight light, const in vec3 direction) {
+	return 1;
+}
+
+float angularAttenuation(const in int lightIndex, const in vec3 direction) {
+	RawLight light_raw = lights.data[lightIndex];
+	const int light_type = int(light_raw.data[3]);
+
+	switch (light_type)
+	{
+	case LIGHT_POINT:
+		return angularAttenuationPoint(toPoint(light_raw), direction);
+	case LIGHT_SPOT:
+		return angularAttenuationSpot(toSpot(light_raw), direction);
+	case LIGHT_QUAD:
+		return angularAttenuationQuad(toQuad(light_raw), direction);
+	case LIGHT_SUN:
+		return angularAttenuationSun(toSun(light_raw), direction);
+	}
+	return 1;
+}
+
+void calcLightParams(const in int lightIndex, const in vec3 hitPosition, const in vec2 randomSample, inout vec3 color, inout vec3 lightPosition, inout vec3 direction, inout float attenuation) {
+	RawLight light_raw = lights.data[lightIndex];
+	const int light_type = int(light_raw.data[3]);
+
+	switch (light_type)
+	{
+	case LIGHT_POINT:
+		calcLightDirPoint(toPoint(light_raw), hitPosition, randomSample, color, lightPosition, direction, attenuation);
+		break;
+	case LIGHT_SPOT:
+		calcLightDirSpot(toSpot(light_raw), hitPosition, randomSample, color, lightPosition, direction, attenuation);
+		break;
+	case LIGHT_QUAD:
+		calcLightDirQuad(toQuad(light_raw), hitPosition, randomSample, color, lightPosition, direction, attenuation);
+		break;
+	case LIGHT_SUN:
+		calcLightDirSun(toSun(light_raw), hitPosition, randomSample, color, lightPosition, direction, attenuation);
+		break;
+	}
+}
+
+bool intersectTriangle(const in Ray ray, const in vec3 v1, const in vec3 v2, const in vec3 v3, inout float t, inout float u, inout float v)
+{
+	float EPSILON = FLT_EPSILON;
+
+	vec3 e1, e2;  //Edge1, Edge2
+	vec3 P, Q, T;
+
+	float det, inv_det;
+
+	//Find vectors for two edges sharing V1
+	e1 = v2 - v1;
+	e2 = v3 - v1;
+
+	//Begin calculating determinant - also used to calculate u parameter
+	P = cross(ray.direction.xyz, e2);
+
+	//if determinant is near zero, ray lies in plane of triangle
+	det = dot(e1, P);
+	//NOT CULLING
+	if (det > -EPSILON && det < EPSILON)
+		return false;
+	inv_det = 1.f / det;
+
+	//calculate distance from V1 to ray origin
+	T = ray.origin.xyz - v1;
+
+	//Calculate u parameter and test bound
+	u = dot(T, P) * inv_det;
+
+	//The intersection lies outside of the triangle
+	if (u < 0.f || u > 1.f) return false;
+
+	//Prepare to test v parameter
+	Q = cross(T, e1);
+
+	//Calculate V parameter and test bound
+	v = dot(ray.direction.xyz, Q) * inv_det;
+	//The intersection lies outside of the triangle
+	if (v < 0.f || u + v  > 1.f) return false;
+
+	t = dot(e2, Q) * inv_det;
+
+	if (t > EPSILON) { //ray intersection
+		return true;
+	}
+
+	// No hit, no win
+	return false;
+}
+bool intersectLightSun(const in Ray ray, const in SunLight light, inout float t)
+{
+	if(light.radius == 0)
+		return false;
+		
+	vec3 temp_position = -light.direction;
+	
+	vec3 direction = normalize(temp_position);
+	
+	vec4 position = vec4(1e16 * direction, 1);
+	
+	float radius = 1e16 * light.radius;
+	
+	float radius_sq = radius * radius;
+    float a = dot(ray.direction, ray.direction);
+    float b = dot(ray.direction, 2 * (ray.origin - position));
+    float c = dot(position, position) + dot(ray.origin, ray.origin) - 2 * dot(ray.origin, position) - radius_sq;
+    float d = b * b - 4 * a * c;
+
+    if ( d < 0 ) {
+        return false;
+    }
+
+    d = sqrt(d);
+    t = (-0.5f) * (b + d) / a;
+	
+	// Always look forward and not behind. As in don't consider a negative t value.
+	if(t<0) return false;
+
+    return true;
+}
+
+uniform bool is_primary;
+
+bool intersectLightPoint(const in Ray ray, const in PointLight light, inout float t)
+{
+    float radius_sq = light.radius * light.radius;
+
+	//I have no idea why, but on non-primary rays we have to add 1 to the squared radius... Doesn't make any sense.
+	//If you see this comment, please fix it.
+	if (!is_primary) {
+		radius_sq += 1;
+	}
+
+	if(radius_sq == 0)
+		return false;
+		
+    float a = dot(ray.direction, ray.direction);
+    float b = dot(ray.direction, 2 * (ray.origin - light.position));
+    float c = dot(light.position, light.position) + dot(ray.origin, ray.origin) - 2 * dot(ray.origin, light.position) - radius_sq;
+    float d = b * b - 4 * a * c;
+
+    if ( d < 0 ) {
+        return false;
+    }
+
+    d = sqrt(d);
+    t = (-0.5f) * (b + d) / a;
+	
+	// Always look forward and not behind. As in don't consider a negative t value.
+	if(t<0) return false;
+
+    return true;
+}
+bool intersectLightSpot(const in Ray ray, const in SpotLight light, inout float t)
+{
+	if(light.radius == 0)
+		return false;
+	// Create a Triangle that fits in the Spotlight's unit-disk
+	vec3 v1 = light.position;
+	vec3 normal = light.direction;
+	// orthonormal basis for spotlight
+	vec3 x = abs(normal.x) > abs(normal.y) ?
+			vec3(-normal.z, 0, normal.x) / sqrt(normal.x * normal.x + normal.z * normal.z):
+			vec3(0, normal.z, -normal.y) / sqrt(normal.y * normal.y + normal.z * normal.z);
+    vec3 y = cross(normal, x);
+	vec3 v2 = light.position + x;
+	vec3 v3 = light.position + y;
+
+	float EPSILON = FLT_EPSILON;
+
+	vec3 e1, e2;  //Edge1, Edge2
+	vec3 P, Q, T;
+
+	float det, inv_det;
+
+	//Find vectors for two edges sharing V1
+	e1 = v2 - v1;
+	e2 = v3 - v1;
+
+	//Begin calculating determinant - also used to calculate u parameter
+	P = cross(ray.direction.xyz, e2);
+
+	//if determinant is near zero, ray lies in plane of triangle
+	det = dot(e1, P);
+	//NOT CULLING
+	if (det > -EPSILON && det < EPSILON)
+		return false;
+	inv_det = 1.f / det;
+
+	//calculate distance from V1 to ray origin
+	T = ray.origin.xyz - v1;
+
+	//Calculate u parameter
+	float u = dot(T, P) * inv_det;
+
+	//Prepare to test v parameter
+	Q = cross(T, e1);
+
+	//Calculate V parameter
+	float v = dot(ray.direction.xyz, Q) * inv_det;
+
+	// u and v are in coordinates of the x and y axis in the spotlights orthonormal coordinate system
+	// the length of the vector (u, v) has to be smaller or equal to the spotlights radius
+	if(u * u + v * v > light.radius * light.radius)
+	{
+		return false;
+	}
+	
+	t = dot(e2, Q) * inv_det;
+
+	if (t > EPSILON) { //ray intersection
+		return true;
+	}
+
+	// No hit, no win
+	return false;
+}
+bool intersectLightQuad(const in Ray ray, const in QuadLight light, inout float t)
+{
+	float u, v;
+	// test with first triangle of quad
+	if(intersectTriangle(ray, light.v0, light.v1, light.v3, t, u, v))
+	{
+		return true;
+	}
+	// if it failed, test with the other triangle
+	return intersectTriangle(ray, light.v2, light.v3, light.v1, t, u, v);
+}
+
+bool intersectLight(const in Ray ray, const in int light_index, inout float t)
+{
+	RawLight light_raw = lights.data[light_index];
+	const int light_type = int(light_raw.data[3]);
+
+	switch (light_type)
+	{
+	case LIGHT_POINT:
+		return intersectLightPoint(ray, toPoint(light_raw), t);
+	case LIGHT_SPOT:
+		return intersectLightSpot(ray, toSpot(light_raw), t);
+	case LIGHT_QUAD:
+		return intersectLightQuad(ray, toQuad(light_raw), t);
+	case LIGHT_SUN:
+		return intersectLightSun(ray, toSun(light_raw), t);
+	}
+}
+
+vec3 sampleLightSourcePoint(vec3 dir, vec3 origin, float t, PointLight light)
+{	
+	return ONE_OVER_PI * light.color.rgb / (light.constant > 0 ? light.constant : 1);
+}
+vec3 sampleLightSourceSun(vec3 dir, vec3 origin, float t, SunLight light)
+{
+	return light.color.rgb;
+}
+vec3 sampleLightSourceQuad(vec3 dir, vec3 origin, float t, QuadLight light)
+{
+	float dirDotDir = dot(normalize(-dir), light.direction.xyz) < 0 ? 0 : 1;
+	
+	return ONE_OVER_PI * dirDotDir * light.color.rgb / (light.constant > 0 ? light.constant : 1);
+}
+vec3 sampleLightSourceSpot(vec3 dir, vec3 origin, float t, SpotLight light)
+{
+	float dirDotDir = dot(normalize(-dir), light.direction.xyz) < 0 ? 0 : 1;
+		
+	return ONE_OVER_PI * dirDotDir * light.color.rgb / (light.constant > 0 ? light.constant : 1);
+}
+
+vec3 sampleLightSource(vec3 dir, vec3 origin, float t, int light_index)
+{
+	RawLight light_raw = lights.data[light_index];
+	const int light_type = int(light_raw.data[3]);
+
+	switch (light_type)
+	{
+	case LIGHT_POINT:
+		return sampleLightSourcePoint(dir, origin, t, toPoint(light_raw));
+	case LIGHT_SPOT:
+		return sampleLightSourceSpot(dir, origin, t, toSpot(light_raw));
+	case LIGHT_QUAD:
+		return sampleLightSourceQuad(dir, origin, t, toQuad(light_raw));
+	case LIGHT_SUN:
+		return sampleLightSourceSun(dir, origin, t, toSun(light_raw));
+	}
+}
+
+bool intersectsAny(const in Ray ray, const in float max_distance);
+
+bool intersectsAnyWithLights(const in Ray ray, const in float t_max, const in int exclude)
+{
+	if(intersectsAny(ray, t_max))
+	{
+		return true;
+	}
+	else
+	{
+		for(int i = 0; i < num_lights; ++i)
+		{
+			if(i == exclude)
+				continue;
+			RawLight light_raw = lights.data[i];
+			int light_type = int(light_raw.data[3]);
+			if(light_type == LIGHT_SUN)
+				continue;
+			float t;
+			if(intersectLight(ray, i, t))
+			{
+				if(t < t_max)
+				{
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+#endif // __INC_LIGHT_COMPUTE

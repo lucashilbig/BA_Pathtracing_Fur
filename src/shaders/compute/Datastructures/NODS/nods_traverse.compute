@@ -1,0 +1,47 @@
+#include "/Datastructures/NODS/nods_input.compute"
+#include "/include/inc_intersectionRayFuncs.compute"
+
+bool traverse(const in Ray ray, inout Intersection hit, const in bool nearest_only, const in float max_distance)
+{
+	bool hit_triangle = false;
+	
+	float t_min = FLT_MAX;
+	float t = t_min;
+
+	for (uint i = 0; i < num_triangles; i++) 
+	{
+		Triangle tri = triangles.data[i];
+
+		float b0, b1, b2; // barycentric coordinates
+
+		if (intersectTriangle(ray, tri, t, b1, b2))
+		{
+			if (t < t_min && t < max_distance) //test for ray_length
+			{
+				hit_triangle = true;
+				b0 = 1.f - b1 - b2;
+
+				t_min = t;
+
+				hit.barycentric = vec3(b1, b2, b0);
+				hit.triangle_index = i;
+
+				if (nearest_only)
+					return true;
+			}
+		}
+	}
+
+	return hit_triangle;
+}
+
+bool nearestIntersection(const in Ray ray, inout Intersection hit)
+{
+	return traverse(ray, hit, false, FLT_MAX);
+}
+
+bool intersectsAny(const in Ray ray, const in float max_distance)
+{
+	Intersection unused_hit;
+	return traverse(ray, unused_hit, true, max_distance);
+}

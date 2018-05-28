@@ -1,0 +1,300 @@
+#include "/include/inc_meshData.compute"
+#include "/Datastructures/BVH/bvh_inputSAH.compute"
+
+uniform int num_invocations;
+
+const float FLT_MAX = 3.40282e+38;
+const float FLT_MIN = -3.40282e+38;
+
+void expandToInclude(inout Bin bin, const in vec3 centroidAxis)
+{
+	bin.min_bound.xyz = min(bin.min_bound.xyz, centroidAxis);
+	bin.max_bound.xyz = max(bin.max_bound.xyz, centroidAxis);
+}
+
+void expandToInclude(inout Bin bin1, const in Bin bin2)
+{
+	bin1.min_bound = min(bin1.min_bound, bin2.min_bound);
+	bin1.max_bound = max(bin1.max_bound, bin2.max_bound);
+}
+
+float surfaceArea(const in Bin bin)
+{
+	vec3 size = bin.max_bound.xyz - bin.min_bound.xyz;
+	return 2.f * dot(size.xxy, size.yzz); // look here if searching for intelligence
+}
+
+void addAABB(inout Node node, const in int start, const in int end)
+{
+	vec4 a, b, c, current_min, current_max;
+	vec4 best_min = vec4(FLT_MAX, FLT_MAX, FLT_MAX, 1.0f);
+	vec4 best_max = vec4(FLT_MIN, FLT_MIN, FLT_MIN, 1.0f);
+	for (int id = start; id <= end; id++) {
+		Triangle t = triangles.data[id];
+		a = vertices.data[t.i0];
+		b = vertices.data[t.i1];
+		c = vertices.data[t.i2];
+		current_min = min(min(a, b), c);
+		current_max = max(max(a, b), c);
+		best_min = min(current_min, best_min);
+		best_max = max(current_max, best_max);
+	}
+	node.min_bound = best_min;
+	node.max_bound = best_max;
+}
+
+bool worthCBSplitting(const in cent_box cb)
+{
+	vec3 diff = cb.bounds[1].xyz - cb.bounds[0].xyz;
+	return diff.x > 0.f && diff.y > 0.f && diff.z > 0.f;
+}
+
+// this is the gpu version of the cpu algorithm on constructing bvh
+void construct()
+{
+	uint gid = gl_GlobalInvocationID.x;
+	if (gid >= num_invocations)
+		return;
+	int start = id_range.data[gid].start_idx;
+	int end = id_range.data[gid].end_idx;
+	int parent_id = id_range.data[gid].parent_id;
+	//centboxes cover the centroids of the triangles, not the whole objects
+	cent_box cebo = cb.data[gid];
+	bool splitting = parent_id < 0 || worthCBSplitting(cebo);
+	// since the thread will now be processed the value of the kernel_counter is decreased
+	atomicAdd(counter.kernel, -1);
+	int leaf_threshold = 1;
+	Node node;
+	// current_node_id is the position in the node buffer in which the new node is stored
+	int current_node_id = int(counter.node + gid);
+	int diff = end - start;
+	if ((diff > leaf_threshold) && splitting) { //inner node
+		//pos is the position in which the new ranges will be stored
+		int pos = atomicAdd(counter.bufferPos, 1);
+		IDRange left_range, right_range;
+		cent_box left_centbox, right_centbox;
+		// since the range is divided in two parts more threads can process the construction.
+		// therefore the kernel_counter is increased by 2
+		atomicAdd(counter.kernel, 2);
+		// 1. the AABB which contains the range's triangle information is added for later processing (traversal)
+		addAABB(node, start, end);
+		// 0 is the flag for inner node in the node buffer
+		node.type = 0;
+		// 2. the split plane which causes the least cost is determined by iterating over the
+		// 3 axes (since it's axis aligned)
+		float best = FLT_MAX;
+		int best_axis = 0;
+		int best_plane = 0;
+		const int num_bins = 16;
+		const int num_planes = num_bins - 1;
+		const float epsilon = 0.1;
+		AxisConstants axis_constants[3];
+
+		Bin bins[3][16];
+		for (int axis = 0; axis < 3; ++axis) {
+			axis_constants[axis].cbmin = cebo.bounds[0][axis];
+			axis_constants[axis].cbmax = cebo.bounds[1][axis];
+			axis_constants[axis].cbdiff = axis_constants[axis].cbmax - axis_constants[axis].cbmin;
+			axis_constants[axis].k = (num_bins * (1 - epsilon)) / axis_constants[axis].cbdiff;
+			//Initialize Bins with default values.
+			for (uint i = 0; i < num_bins; ++i) {
+				bins[axis][i].max_bound.xyz = vec3(FLT_MIN);
+				bins[axis][i].min_bound.xyz = vec3(FLT_MAX);
+				bins[axis][i].num_obj = 0;
+			}
+		}
+
+		// This is the thing that takes too damn long
+		for (uint id = start; id <= end; ++id) {
+			vec3 centroidAxis = triangle_centroids.data[id].xyz;
+			for (int axis = 0; axis < 3; ++axis) {
+				int bin_id = int(axis_constants[axis].k * (centroidAxis[axis] - axis_constants[axis].cbmin));
+				// expandToInclude(bins[bin_id], centroidAxis);
+				bins[axis][bin_id].min_bound.xyz = min(bins[axis][bin_id].min_bound.xyz, centroidAxis);
+				bins[axis][bin_id].max_bound.xyz = max(bins[axis][bin_id].max_bound.xyz, centroidAxis);
+				++(bins[axis][bin_id].num_obj);
+			}
+		}
+
+		for (int axis = 0; axis < 3; ++axis) {
+			Bin left_bounds[15];
+			//Again, initialize all bounds.
+			for (uint i = 0; i < num_planes; ++i) {
+				left_bounds[i].max_bound.xyz = vec3(FLT_MIN);
+				left_bounds[i].min_bound.xyz = vec3(FLT_MAX);
+				left_bounds[i].num_obj = 0;
+			}
+
+			left_bounds[0].min_bound = min(left_bounds[0].min_bound, bins[axis][0].min_bound);
+			left_bounds[0].max_bound = max(left_bounds[0].max_bound, bins[axis][0].max_bound);
+			// expandToInclude(left_bounds[0], bins[0]);
+			left_bounds[0].num_obj = bins[axis][0].num_obj;
+			for (int plane = 1; plane < num_planes; ++plane) {
+				left_bounds[plane].min_bound = min(min(left_bounds[plane].min_bound, left_bounds[plane - 1].min_bound), bins[axis][plane].min_bound);
+				left_bounds[plane].max_bound = max(max(left_bounds[plane].max_bound, left_bounds[plane - 1].max_bound), bins[axis][plane].max_bound);
+				// expandToInclude(left_bounds[plane], left_bounds[plane - 1]);
+				// expandToInclude(left_bounds[plane], bins[plane]);
+				left_bounds[plane].num_obj = left_bounds[plane - 1].num_obj + bins[axis][plane].num_obj;
+			}
+
+
+			Bin right_bounds[15];
+			//Again and again, initialize bounds.
+			for (uint i = 0; i < num_planes; ++i) {
+				right_bounds[i].max_bound.xyz = vec3(FLT_MIN);
+				right_bounds[i].min_bound.xyz = vec3(FLT_MAX);
+				right_bounds[i].num_obj = 0;
+			}
+
+			for (int plane = num_planes - 1; plane >= 0; --plane) {
+
+				right_bounds[plane].min_bound = min(right_bounds[plane].min_bound, bins[axis][plane + 1].min_bound);
+				right_bounds[plane].max_bound = max(right_bounds[plane].max_bound, bins[axis][plane + 1].max_bound);
+				// expandToInclude(right_bounds[plane], bins[plane + 1]);
+				right_bounds[plane].num_obj = bins[axis][plane + 1].num_obj;
+
+				if (plane != num_planes - 1) {
+					right_bounds[plane].min_bound = min(right_bounds[plane].min_bound, right_bounds[plane + 1].min_bound);
+					right_bounds[plane].max_bound = max(right_bounds[plane].max_bound, right_bounds[plane + 1].max_bound);
+					// expandToInclude(right_bounds[plane], right_bounds[plane + 1]);
+					right_bounds[plane].num_obj += right_bounds[plane + 1].num_obj;
+				}
+
+				float surface_area_left = surfaceArea(left_bounds[plane]);
+				float surface_area_right = surfaceArea(right_bounds[plane]);
+
+				float cost = surface_area_left * left_bounds[plane].num_obj + surface_area_right * right_bounds[plane].num_obj;
+				if (cost < best) {
+					best = cost;
+					best_axis = axis;
+					best_plane = plane;
+					left_centbox.bounds[0] = left_bounds[plane].min_bound;
+					left_centbox.bounds[1] = left_bounds[plane].max_bound;
+					right_centbox.bounds[0] = right_bounds[plane].min_bound;
+					right_centbox.bounds[1] = right_bounds[plane].max_bound;
+				}
+			}
+		}
+		//3. sorting the triangle ids to their correct ranges
+		const float cbmin = axis_constants[best_axis].cbmin;
+		const float k = axis_constants[best_axis].k;
+		int left = start;
+		int right = end;
+		bool left_stopped = false;
+		bool right_stopped = false;
+
+		while (left < right) {
+			if (!left_stopped) {
+				float centroid_best_axis_left = triangle_centroids.data[left][best_axis];
+				int bin_id_left = int(k * (centroid_best_axis_left - cbmin));
+				if (bin_id_left > best_plane) {
+					left_stopped = true;
+				}
+				else {
+					++left;
+				}
+			}
+			if (!right_stopped) {
+				float centroid_best_axis_right = triangle_centroids.data[right][best_axis];
+				int bin_id_right = int(k * (centroid_best_axis_right - cbmin));
+				if (bin_id_right <= best_plane) {
+					right_stopped = true;
+				}
+				else {
+					--right;
+				}
+			}
+			if (left_stopped && right_stopped) {
+				//swap triangles and centroids
+				Triangle tmp_triangle = triangles.data[left];
+				triangles.data[left] = triangles.data[right];
+				triangles.data[right] = tmp_triangle;
+
+				vec4 tmp_centroid = triangle_centroids.data[left];
+				triangle_centroids.data[left] = triangle_centroids.data[right];
+				triangle_centroids.data[right] = tmp_centroid;
+
+				left_stopped = false;
+				right_stopped = false;
+				++left;
+				--right;
+			}
+		}
+		//determing left_range, right_range for the following threads
+		left_range.start_idx = start;
+		right_range.end_idx = end;
+		if (left > right) {
+			left_range.end_idx = right;
+			right_range.start_idx = left;
+		}
+		else {
+			if (left_stopped) {
+				left_range.end_idx = left - 1;
+				right_range.start_idx = left;
+			}
+			else if (right_stopped) {
+				left_range.end_idx = right;
+				right_range.start_idx = right + 1;
+			}
+			else {
+				float centroid_best_axis_left = triangle_centroids.data[left][best_axis];
+
+				int bin_id_left = int(k * (centroid_best_axis_left - cbmin));
+
+				if (bin_id_left > best_plane) {
+					left_range.end_idx = left - 1;
+					right_range.start_idx = left;
+				}
+				else {
+					left_range.end_idx = left;
+					right_range.start_idx = left + 1;
+				}
+			}
+		}
+		left_range.parent_id = current_node_id;
+		right_range.parent_id = current_node_id;
+		//writing the id_ranges and centboxes to the buffers for processing in following threads
+		id_range_tmp.data[pos * 2] = left_range;
+		id_range_tmp.data[pos * 2 + 1] = right_range;
+		cb_tmp.data[pos * 2] = left_centbox;
+		cb_tmp.data[pos * 2 + 1] = right_centbox;
+		node.parent = parent_id;
+		//5. writing to the node_buffer for traversal in another kernel
+		nodes.data[current_node_id] = node;
+		if (parent_id > -1) {
+			if (current_node_id % 2 == 0) {
+				nodes.data[parent_id].right_idx = current_node_id;
+			}
+			else {
+				nodes.data[parent_id].left_idx = current_node_id;
+			}
+		}
+	}
+	else //leaf node
+	{
+		addAABB(node, start, end);
+		node.type = 1;
+		node.left_idx = start;
+		node.right_idx = end;
+		node.parent = parent_id;
+		nodes.data[current_node_id] = node;
+		if (parent_id > -1) {
+			if (current_node_id % 2 == 0) {
+				nodes.data[parent_id].right_idx = current_node_id;
+			}
+			else {
+				nodes.data[parent_id].left_idx = current_node_id;
+			}
+		}
+		atomicAdd(counter.leaf, 1);
+	}
+}
+
+void secureAccess()
+{
+	uint gid = gl_GlobalInvocationID.x;
+	if (gid >= num_invocations)
+		return;
+	id_range.data[gid] = id_range_tmp.data[gid];
+	cb.data[gid] = cb_tmp.data[gid];
+}

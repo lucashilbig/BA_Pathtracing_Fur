@@ -1,0 +1,37 @@
+vec3 evaluateLight(const in Intersection intersection, const in vec3 local_input_ray, const in vec3 local_output_ray)
+{
+	Triangle tri = triangleOf(intersection);
+	Material material = materialOf(tri);
+
+	vec2 uv = fromBarycentric(intersection.barycentric, uvs.data, tri);
+	vec3 normal = fromBarycentric(intersection.barycentric, normals.data, tri).xyz;
+	
+	bool reflect = dot(local_input_ray, normal) * dot(local_output_ray, normal) > 0;
+
+	if(reflect){
+		return getMaterialColorParam(material.diffuse, uv).xyz * ONE_OVER_PI;
+	}
+    return vec3(0);
+}
+
+vec3 localSample(const in Intersection hit, const in vec3 local_input_ray, const in vec3 normal, const in vec2 sampling, inout vec3 local_output_ray, inout float output_pdf, inout int mat_flags)
+{
+	Triangle tri = triangleOf(hit);
+	Material material = materialOf(tri);
+
+	bool entering = dot(local_input_ray, normal) > 0.f;
+
+	local_output_ray = localToWorldNormal(entering ? cosineHemisphereSample(sampling.x, sampling.y) : -cosineHemisphereSample(sampling.x, sampling.y), normal);
+
+	output_pdf = abs(dot(local_output_ray, normal)) * ONE_OVER_PI;
+	mat_flags = 0;
+
+	if (output_pdf == 0.f)
+	{
+		return vec3(0.f);
+	}
+
+	vec2 uv = fromBarycentric(hit.barycentric, uvs.data, tri);
+
+	return getMaterialColorParam(material.diffuse, uv).xyz * ONE_OVER_PI;
+}

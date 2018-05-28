@@ -1,0 +1,56 @@
+#include "include/inc_intersectionRayStructs.compute"
+#include "include/inc_meshData.compute"
+
+#include "Pathtracer/pt_input.compute"
+
+const int MATFLAG_TRANSPARENT_BOUNCE = 1 << 0;
+const int MATFLAG_SPECULAR_BOUNCE = 1 << 1;
+const int MATFLAG_EMISSIVE_BOUNCE = 1 << 2;
+
+//Base functions for bsdf calculation
+vec3 localSample(const in Intersection hit, const in vec3 local_input_ray, const in vec3 normal, const in vec2 sampling, inout vec3 local_output_ray, inout float output_pdf, inout int mat_flags);
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Functions
+////////
+////////////////////////////////////////////////////////////////////
+vec3 worldToLocal(const in vec3 v, const in vec3 ss, const in vec3 ts, const in vec3 ns)
+{
+	return vec3(dot(v, ss), dot(v, ts), dot(v, ns));
+}
+
+vec3 localToWorld(const in vec3 v, const in vec3 ss, const in vec3 ts, const in vec3 ns)
+{
+	return v.x * ss + v.y * ts + v.z * ns;
+}
+
+vec3 worldToLocalNormal(const in vec3 v, const in vec3 normal) {
+	vec3 n = normal;
+	vec3 dx0 = vec3(0, n.z, -n.y);
+	vec3 dx1 = vec3(-n.z, 0, n.x);
+	vec3 s = normalize(n.y*n.y > n.x*n.x ? dx0 : dx1);
+	vec3 t = normalize(cross(n, s));
+
+	return worldToLocal(v, s, t, n); // bring vectors to local shading space
+}
+
+vec3 localToWorldNormal(const in vec3 v, const in vec3 normal) {
+	vec3 n = normal;
+	vec3 dx0 = vec3(0, n.z, -n.y);
+	vec3 dx1 = vec3(-n.z, 0, n.x);
+	vec3 s = normalize(n.y*n.y > n.x*n.x ? dx0 : dx1);
+	vec3 t = normalize(cross(n, s));
+
+	return localToWorld(v, s, t, n); // bring vectors to local shading space
+}
+
+vec3 reflectance(const in Intersection hit, const in vec3 ray_in, const in vec3 normal, inout vec3 ray_out, inout float pdf, inout int mat_flags, const in vec2 sampling)
+{
+	if (dot(ray_in, normal) == 0)
+	{
+		return vec3(0.f);
+	}
+
+	return localSample(hit, ray_in, normal, sampling, ray_out, pdf, mat_flags);
+}

@@ -1,0 +1,40 @@
+#ifndef __PT_SORT_HITS_COMPUTE
+#define __PT_SORT_HITS_COMPUTE
+#include "Pathtracer/pt_input.compute"
+
+layout(std430) restrict buffer xRayBuffer {
+	IntersectionRay data[];
+} intersectionRaysValid;
+
+layout(std430) restrict buffer validRayBuffer {
+	IntersectionRay data[];
+} intersectionRaysCheck;
+
+layout(std430) buffer validHitsCountBuffer {
+	uint value;
+} b_num_valid_intersections;
+
+void sort(){
+	uint x = gl_GlobalInvocationID.x;
+	
+	if(x >= debug.invocation_count){
+		return;
+	}
+
+	if(intersectionRaysValid.data[x].intersection.barycentric.x != -1){
+		// //Which means the intersection is valid...
+		 intersectionRaysCheck.data[atomicAdd(b_num_valid_intersections.value, 1)] = intersectionRaysValid.data[x];
+	 }	
+}
+
+void writeBack(){
+	uint x = gl_GlobalInvocationID.x;
+	
+	if(x >= debug.invocation_count){
+		return;
+	}
+
+	intersectionRaysValid.data[x] = intersectionRaysCheck.data[x];
+}
+
+#endif //__PT_SORT_HITS_COMPUTE

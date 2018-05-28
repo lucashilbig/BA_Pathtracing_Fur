@@ -1,0 +1,16 @@
+vec3 localSample(const in Intersection hit, const in vec3 local_input_ray, const in vec3 normal, const in vec2 sampling, inout vec3 local_output_ray, inout float output_pdf, inout int mat_flags)
+{
+	Triangle tri = triangleOf(hit);
+	Material material = materialOf(tri);
+	output_pdf = 1.f;
+	local_output_ray = reflect(-local_input_ray, faceforward(normal, -local_input_ray, normal));
+	
+	vec2 uv = fromBarycentric(hit.barycentric, uvs.data, tri);
+	mat_flags |= MATFLAG_SPECULAR_BOUNCE;
+	return getMaterialColorParam(material.specular, uv).xyz / abs(dot(local_output_ray, normal));
+}
+
+vec3 evaluateLight(const in Intersection intersection, const in vec3 local_input_ray, const in vec3 local_output_ray)
+{
+	return vec3(0);
+}

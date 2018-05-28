@@ -1,0 +1,86 @@
+#ifndef __INTERSECTION_RAY_FUNCS_COMPUTE
+#define __INTERSECTION_RAY_FUNCS_COMPUTE
+
+#include "include/inc_intersectionRayStructs.compute"
+
+//IntersectionRay
+
+////////////////////////////////////////////////////////////////////
+////////
+////////	Helper functions
+////////
+////////////////////////////////////////////////////////////////////
+
+bool intersectAABB(const in Ray ray, const in vec4 minBound, const in vec4 maxBound)
+{
+	vec3 dirfrac = 1.0f / ray.direction.xyz;
+
+	//intersections with box planes parallel to x, y, z axis
+	float t1 = (minBound.x - ray.origin.x)*dirfrac.x;
+	float t3 = (minBound.y - ray.origin.y)*dirfrac.y;
+	float t5 = (minBound.z - ray.origin.z)*dirfrac.z;
+	float t2 = (maxBound.x - ray.origin.x)*dirfrac.x;
+	float t4 = (maxBound.y - ray.origin.y)*dirfrac.y;
+	float t6 = (maxBound.z - ray.origin.z)*dirfrac.z;
+	
+	float tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+	float tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+
+	return tmax >= 0 && tmin <= tmax;
+}
+
+bool intersectTriangle(const in Ray ray, const in Triangle tri, inout float t, inout float u, inout float v)
+{
+	float EPSILON = FLT_EPSILON;
+
+	vec3 e1, e2;  //Edge1, Edge2
+	vec3 P, Q, T;
+
+	float det, inv_det;
+	
+	vec3 v1 = vertices.data[tri.i0].xyz;
+	vec3 v2 = vertices.data[tri.i1].xyz;
+	vec3 v3 = vertices.data[tri.i2].xyz;
+
+	//Find vectors for two edges sharing V1
+	e1 = v2 - v1;
+	e2 = v3 - v1;
+
+	//Begin calculating determinant - also used to calculate u parameter
+	P = cross(ray.direction.xyz, e2);
+
+	//if determinant is near zero, ray lies in plane of triangle
+	det = dot(e1, P);
+	//NOT CULLING
+	if (det > -EPSILON && det < EPSILON)
+		return false;
+	inv_det = 1.f / det;
+
+	//calculate distance from V1 to ray origin
+	T = ray.origin.xyz - v1;
+
+	//Calculate u parameter and test bound
+	u = dot(T, P) * inv_det;
+
+	//The intersection lies outside of the triangle
+	if (u < 0.f || u > 1.f) return false;
+
+	//Prepare to test v parameter
+	Q = cross(T, e1);
+
+	//Calculate V parameter and test bound
+	v = dot(ray.direction.xyz, Q) * inv_det;
+	//The intersection lies outside of the triangle
+	if (v < 0.f || u + v  > 1.f) return false;
+
+	t = dot(e2, Q) * inv_det;
+
+	if (t > EPSILON) { //ray intersection
+		return true;
+	}
+
+	// No hit, no win
+	return false;
+}
+
+#endif //__INTERSECTION_RAY_FUNCS_COMPUTE

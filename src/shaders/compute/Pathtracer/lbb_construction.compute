@@ -1,0 +1,404 @@
+#include "include/inc_light.compute"
+#include "Pathtracer/bsdf_base.compute"
+#include "Pathtracer/pt_input.compute"
+
+//TODO: This will need it's own function like sample2Dpoint, because that one works with screen width/height
+//TODO: Also 2 such 2D point samples need to be generated so we need a second random value as input
+struct LightBounce
+{
+	Ray ray;
+	Intersection intersection;
+	vec4 base_color; // color is the original color, wighted with angular attenuation if applicable.
+				// color.a is the total distance traveled
+	vec4 hit_color; //Sadly we need this to remember the real bsdf color result from hitting a triangle.
+					// .a is the pdf
+	float att_lin; // distance attenuation will be calculated when the shading is done with the lightBounce
+	float att_quad; // distance attenuation will be calculated when the shading is done with the lightBounce
+	int light_index; // Index of the light that generated this path
+	int mat_flags; // 
+};
+
+layout(std430) restrict buffer lightBounceBuffer
+{
+	LightBounce data[];
+} lightBounces;
+
+uniform int samples_per_light;
+uniform int bounces_per_path;
+
+uniform int buffer_offset; //offsets the buffer index, so the lightbounces won't be considered multiple times.
+
+//TODO: don't mind the #defines, I'm trying out a more modular system for self-defined lights (like for BSDFs)
+//Those won't be in here when it all works, but the calcLightBounce functions will be moved to dedicated light modules for each light source type.
+
+#define calcLightBounce calcLightBouncePoint
+void calcLightBounce(const in PointLight light, const in vec2 randomSample1, const in vec2 randomSample2, inout LightBounce bounce)
+{
+	vec3 position = light.position.xyz;
+	vec3 n = uniformSphereSample(randomSample1.x, randomSample1.y);
+
+	vec3 dir = cosineHemisphereSample(randomSample2.x, randomSample2.y); // This will be in local coordinates with normal (0,0,1)
+
+	vec3 dx0 = vec3(0, n.z, -n.y);
+	vec3 dx1 = vec3(-n.z, 0, n.x);
+	vec3 s = normalize(n.y*n.y > n.x*n.x ? dx0 : dx1);
+	vec3 t = normalize(cross(n, s));
+
+	dir = localToWorld(dir, s, t, n); // transforms it back to world coordinates with above normal
+
+	bounce.ray.origin = vec4(position + n * light.radius, 0);
+	bounce.ray.direction = vec4(dir, 0);
+	bounce.base_color = light.color;
+	bounce.hit_color = bounce.base_color;
+	bounce.base_color.a = 0;
+	bounce.att_lin = light.attenuation_linear;
+	bounce.att_quad = light.attenuation_quadratic;
+}
+#undef calcLightBounce
+
+#define calcLightBounce calcLightBounceSun
+void calcLightBounce(const in SunLight light, const in vec2 randomSample1, const in vec2 randomSample2, inout LightBounce bounce)
+{
+	vec3 position = -light.direction;
+	vec3 randPoint = uniformSphereSample(randomSample1.x, randomSample1.y);
+	position += randPoint*light.radius;
+	vec3 direction = normalize(position);
+
+	position = position + 1e16*direction;
+
+	bounce.ray.origin = vec4(position, 0);
+	bounce.ray.direction = vec4(light.direction, 0);
+	bounce.base_color = light.color;
+	bounce.hit_color = bounce.base_color;
+	bounce.base_color.a = 0;
+	bounce.att_lin = 0;
+	bounce.att_quad = 0;
+}
+#undef calcLightBounce
+
+#define calcLightBounce calcLightBounceSpot
+void calcLightBounce(const in SpotLight light, const in vec2 randomSample1, const in vec2 randomSample2, inout LightBounce bounce)
+{
+	vec3 position = light.position.xyz;
+	vec3 n = light.direction;
+
+	vec3 posRand = cosineHemisphereSample(randomSample1.x, randomSample1.y); // This will be in local coordinates with normal (0,0,1)
+	posRand.z = 0; //hacked together disk
+	posRand = posRand * light.radius;
+
+	vec3 dirRand = sampleAngle(randomSample2.x, randomSample2.y, radians(light.angle_outer)); // This will be in local coordinates with normal (0,0,1)
+
+
+	vec3 dx0 = vec3(0, n.z, -n.y);
+	vec3 dx1 = vec3(-n.z, 0, n.x);
+	vec3 s = normalize(n.y*n.y > n.x*n.x ? dx0 : dx1);
+	vec3 t = normalize(cross(n, s));
+
+	posRand = localToWorld(posRand, s, t, n); // transforms it back to world coordinates with above normal
+	dirRand = localToWorld(dirRand, s, t, n); // transforms it back to world coordinates with above normal
+
+	bounce.ray.origin = vec4(position + posRand, 0);
+	bounce.ray.direction = vec4(dirRand, 0);
+
+	float lightToSurfaceAngle = degrees(acos(dot(normalize(dirRand), light.direction)));
+	float attenuation = 1 - clamp((lightToSurfaceAngle - light.angle_inner) / ((light.angle_outer - light.angle_inner)), 0.f, 1.f);
+	bounce.base_color = light.color;
+	bounce.hit_color = attenuation * bounce.base_color;
+	bounce.base_color.a = 0;
+	bounce.att_lin = 0;
+	bounce.att_quad = 0;
+}
+#undef calcLightBounce
+
+#define calcLightBounce calcLightBounceQuad
+void calcLightBounce(const in QuadLight light, const in vec2 randomSample1, const in vec2 randomSample2, inout LightBounce bounce)
+{
+	vec3 x1 = light.v0 + randomSample1.x * (light.v1 - light.v0);
+	vec3 x2 = light.v3 + randomSample1.x * (light.v2 - light.v3);
+	vec3 position = x1 + randomSample1.y * (x2 - x1);
+	
+	vec3 n = light.direction;
+
+	vec3 dir = cosineHemisphereSample(randomSample2.x, randomSample2.y); // This will be in local coordinates with normal (0,0,1)
+
+	vec3 dx0 = vec3(0, n.z, -n.y);
+	vec3 dx1 = vec3(-n.z, 0, n.x);
+	vec3 s = normalize(n.y*n.y > n.x*n.x ? dx0 : dx1);
+	vec3 t = normalize(cross(n, s));
+
+	dir = localToWorld(dir, s, t, n); // transforms it back to world coordinates with above normal
+
+	bounce.ray.origin = vec4(position, 0);
+	bounce.ray.direction = vec4(dir, 0);
+
+	float dirDotDir = dot(normalize(dir), light.direction.xyz);
+	bounce.base_color = light.color;
+	bounce.hit_color = dirDotDir * bounce.base_color;
+	bounce.base_color.a = 0;
+	bounce.att_lin = light.attenuation_linear;
+	bounce.att_quad = light.attenuation_quadratic;
+}
+#undef calcLightBounce
+
+void calcLightBounce(const in int lightIndex, const in vec2 randomSample1, const in vec2 randomSample2, inout LightBounce bounce)
+{
+	RawLight light_raw = lights.data[lightIndex];
+	const int light_type = int(light_raw.data[3]);
+	
+	bounce.light_index = lightIndex;
+
+	switch (light_type)
+	{
+	case LIGHT_POINT:
+		calcLightBouncePoint(toPoint(light_raw), randomSample1, randomSample2, bounce);
+		break;
+	case LIGHT_SPOT:
+		calcLightBounceSpot(toSpot(light_raw), randomSample1, randomSample2, bounce);
+		break;
+	case LIGHT_QUAD:
+		calcLightBounceQuad(toQuad(light_raw), randomSample1, randomSample2, bounce);
+		break;
+	case LIGHT_SUN:
+		calcLightBounceSun(toSun(light_raw), randomSample1, randomSample2, bounce);
+		break;
+	}
+}
+
+vec2 sample2DPoint2(int rnd) {
+	uint x = gl_GlobalInvocationID.x + uint(buffer_offset);
+	uint start = uint(rnd)* debug.invocation_count;
+	rng_state += WangHash(start + x);
+	float rand = float(rand_xorshift()) * (1.0 / UINT_MAX);
+	return hammersley2d(uint(rand* RANDOM_SAMPLING_FACTOR), INV_RANDOM_SAMPLING_FACTOR);
+}
+
+// float convertDensity ( const in LightBounce v, float pdf, const in LightBounce next ) {
+	// Triangle v_tri 		= triangleOf(v.intersection);
+	// Triangle next_tri 	= triangleOf(next.intersection);
+
+	// vec3 v_pos 			= fromBarycentric(v.intersection.barycentric, vertices.data, v_tri).xyz;
+	// vec3 next_pos 		= fromBarycentric(next.intersection.barycentric, vertices.data, next_tri).xyz;
+	// vec3 next_normal 		= fromBarycentric(next.intersection.barycentric, normals.data, next_tri).xyz;
+    // vec3 w = next_pos - v_pos;
+
+    // if(dot(w, w) == 0){
+        // return 0;
+    // }
+
+    // float inv_dist_sq = 1 / dot(w, w);
+    // pdf *= abs(dot(next_normal, w * sqrt(inv_dist_sq)));
+
+    // return pdf * inv_dist_sq;
+// }
+
+//Run this n times. Each invocation generates rays for ALL lights.
+void generatePrimaryLightRays()
+{
+	int id = int(gl_GlobalInvocationID.x);
+	
+	if(gl_GlobalInvocationID.x >= debug.invocation_count)
+	{
+		return;
+	}
+
+	for (int i = 0; i < num_lights; i++)
+	{
+		vec2 points1 = sample2DPoint2(sampling.random_input);
+		vec2 points2 = sample2DPoint2(sampling.random_input_2);
+		//Initialize bounce with all-zero-values.
+		LightBounce lb = { 
+			{
+				{0, 0, 0, 0},
+				{ 0, 0, 0, 0 },
+				{ 0, 0},{0, 0 }
+			},
+			{
+				{ 0, 0, 0},
+				0,
+				{ 0, 0 },
+				0,
+				0
+			},
+			{ 0, 0, 0, 0 },
+			{ 0, 0, 0, 0 },
+			0,
+			0,
+			0,
+			0
+		};
+		calcLightBounce(i, points1, points2, lb);
+		
+		lb.hit_color = vec4(ONE_OVER_PI);
+
+		lightBounces.data[id * num_lights + i + buffer_offset] = lb;
+		lightBounces.data[id * num_lights + i] = lb;
+		lightBounces.data[id * num_lights + i].ray.direction = vec4(0, 0, 0, 0);
+	}
+}
+
+//Run this for all LightBounces (see debug.invocation_count).
+void traceLightRays()
+{
+	int id = int(gl_GlobalInvocationID.x) + buffer_offset;
+
+	if(gl_GlobalInvocationID.x >= debug.invocation_count)
+	{
+		return;
+	}
+
+	Ray ray = lightBounces.data[id].ray;
+	Intersection hit = lightBounces.data[id].intersection;
+
+	//int stride = (int(debug.invocation_count) * num_lights);
+	int next_id = id + int(debug.invocation_count) * num_lights;
+
+	int max_id = bounces_per_path * samples_per_light * num_lights - 1;
+	//Just clamp it.
+	next_id = min(max_id, next_id);
+	
+	//TODO: length(lightBounces.data[id].ray.direction) == 0 || <- that resolves the crashing, but how can the ray have a length of zero here?
+	if (hit.barycentric.x == -1)
+	{
+		//Block this and the next bounce from being calculated.
+		lightBounces.data[id].intersection.barycentric.x = -1;
+
+		if(next_id < max_id)
+			lightBounces.data[next_id].intersection.barycentric.x = -1;
+		return;
+	}
+
+	if (!nearestIntersection(ray, hit))
+	{
+		hit.barycentric.x = -1;
+	} else if (next_id < max_id)
+	{
+		lightBounces.data[next_id].intersection.barycentric.x = 0; // This might have been -1 in a previous Iteration
+	}
+	lightBounces.data[id].intersection = hit;
+}
+
+float convertDensity(const in LightBounce v, inout float pdf, const in LightBounce next){
+	Triangle v_tri 		= triangleOf(v.intersection);
+	vec3 v_pos 			= fromBarycentric(v.intersection.barycentric, vertices.data, v_tri).xyz;
+	
+	Triangle next_tri 		= triangleOf(next.intersection);
+	vec3 next_pos 			= fromBarycentric(next.intersection.barycentric, vertices.data, next_tri).xyz;
+	vec3 next_normal 		= fromBarycentric(next.intersection.barycentric, normals.data, next_tri).xyz;
+	
+    vec3 w = next_pos - v_pos;
+
+    if(dot(w, w) == 0){
+		pdf = 0;
+        return 0;
+    }
+
+    float inv_dist_sq = 1 / dot(w, w);
+    pdf *= abs(dot(next_normal, w * sqrt(inv_dist_sq)));
+
+    return pdf * inv_dist_sq;
+}
+
+void shadeLightRays()
+{
+	int id = int(gl_GlobalInvocationID.x) + int(buffer_offset);
+	
+	if(gl_GlobalInvocationID.x >= debug.invocation_count)
+	{
+		return;
+	}
+
+	LightBounce light_bounce = lightBounces.data[id];
+	Intersection intersection = light_bounce.intersection;
+	bool found_intersection = intersection.barycentric.x != -1;
+
+	// Add background light or emitted light if this is the first hit or if the last (!) hit was a specular surface
+	if (!found_intersection)
+	{
+		return;
+	}	
+
+	Triangle tri = triangleOf(intersection);
+	Material material = materialOf(tri);
+	
+	//Get data from intersection
+	Ray in_ray = light_bounce.ray;
+	vec3 pos = fromBarycentric(intersection.barycentric, vertices.data, tri).xyz;
+	vec3 normal = fromBarycentric(intersection.barycentric, normals.data, tri).xyz;
+	vec2 uv = fromBarycentric(intersection.barycentric, uvs.data, tri);
+	vec2 sample2d = sample2DPoint2(sampling.random_input);
+
+	// calculate the distance from the light source. 
+	light_bounce.base_color.a += distance(pos, in_ray.origin.xyz); //in_ray.origin is the last hit position (or the light source position, depending on the bounce counter.)
+
+	// set the attenuations
+	float attenuation = 1 / (1 + light_bounce.base_color.a * light_bounce.att_lin + light_bounce.base_color.a * light_bounce.base_color.a * light_bounce.att_quad);
+
+	vec3 out_ray;
+	float pdf;
+	// use the shade function from the hit triangle bsdf to calculate a pdf, a new ray direction and the alternated color for this light bounce.
+	// Set the value for hit_color
+	int flags;
+
+	int last_id = id - int(debug.invocation_count) * num_lights;
+	
+	light_bounce.hit_color.rgb = lightBounces.data[last_id].hit_color.rgb * reflectance(intersection, -in_ray.direction.xyz, normal, out_ray, pdf, flags, sample2d);
+	convertDensity(lightBounces.data[last_id], pdf, light_bounce);
+	light_bounce.hit_color.rgb *=  clamp(abs(dot(out_ray, normal)) * pdf, 0, 1);
+	
+	light_bounce.mat_flags = flags;
+	// END OF DANGER
+	//Write back to buffer.
+	lightBounces.data[id] = light_bounce;
+
+	//calculate new LightBounce id
+	//stride: inv_count * light_count
+	//curr buff segment: buffer_offset/debug.invocation_count (int)
+	//Take next buff segment and offset to actual location.
+	//TODO: Is it right like this?
+	int next_id = id + int(debug.invocation_count);
+	int max_id = bounces_per_path * samples_per_light * num_lights - 1;
+	//Just clamp it.
+	next_id = min(max_id, next_id);
+
+	bool not_consider_next = (next_id >= max_id);
+
+	if ((flags & MATFLAG_EMISSIVE_BOUNCE) == MATFLAG_EMISSIVE_BOUNCE){
+		lightBounces.data[id].intersection.barycentric.x = -1;
+		if(!not_consider_next)
+			lightBounces.data[next_id].intersection.barycentric.x = -1;
+		return;
+	}
+
+	// do a quick check against pdf, color luminosity, as well as the attenuation and set barycentric.x = -1 if it doesn't make sense to follow the ray further. return if necessary.
+	//TODO: add debug.min_attenuation or something.
+	Intersection newIntersection;
+	if (light_bounce.hit_color.rgb == vec3(0.f) || pdf <= debug.min_pdf || attenuation <= 0.0001f)
+	{
+		//don't consider this AND the next ray.
+		lightBounces.data[id].intersection.barycentric.x = -1;
+		if (!not_consider_next)
+			lightBounces.data[next_id].intersection.barycentric.x = -1;
+		return;
+	}
+
+	//True, when next_id overshoots the maximum id.
+	if (not_consider_next) {
+		return;
+	}
+
+	// If not returned, create a new ray for the next LightBounce.
+	Ray ray;
+	ray.origin = vec4(pos + debug.bounce_bias*out_ray, 0); //1e-4f is bounce bias
+	ray.direction = vec4(out_ray, 0);
+
+	//lightBounces.data[next_id] = lightBounces.data[id];
+	lightBounces.data[next_id].ray = ray;
+	lightBounces.data[next_id].intersection = newIntersection;
+	lightBounces.data[next_id].base_color = lightBounces.data[id].base_color;
+	lightBounces.data[next_id].hit_color = lightBounces.data[id].hit_color;
+	lightBounces.data[next_id].light_index = lightBounces.data[id].light_index;
+	lightBounces.data[next_id].att_lin = lightBounces.data[id].att_lin;
+	lightBounces.data[next_id].att_quad = lightBounces.data[id].att_quad;
+
+	// Now you can run the traceLigthRays shader again with the buffer_offset moved by invocation_count * num_lights.
+}

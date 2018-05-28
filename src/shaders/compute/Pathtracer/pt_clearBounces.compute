@@ -1,0 +1,21 @@
+#ifndef __PT_CLEAR_BOUNCES_COMPUTE
+#define __PT_CLEAR_BOUNCES_COMPUTE
+
+#include "Pathtracer/pt_input.compute"
+
+//Resets all bounces to their needed default values.
+void clearBounces()
+{
+	uint x = gl_GlobalInvocationID.x;
+	uint y = gl_GlobalInvocationID.y;
+	
+	if(x >= screen.width || y >= screen.height){
+		return;
+	}
+	
+	bounces.data[pixelToLinear(x, y)].color = vec4(0,0,0,1);
+	bounces.data[pixelToLinear(x, y)].light_weight = vec3(1, 1, 1);
+	bounces.data[pixelToLinear(x, y)].mat_flags = 0;
+}
+
+#endif //__PT_CLEAR_BOUNCES_COMPUTE

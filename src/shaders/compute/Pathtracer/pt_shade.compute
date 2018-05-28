@@ -1,0 +1,289 @@
+#ifndef __PT_SHADE_COMPUTE
+#define __PT_SHADE_COMPUTE
+
+#include "Pathtracer/bsdf_base.compute"
+#include "Pathtracer/pt_input.compute"
+
+float geometryTerm (vec3 p0, vec3 p1, vec3 n0, vec3 n1)
+{
+    vec3 d = p0 - p1;
+    float g = 1 / dot(d, d);
+    d *= sqrt(g);
+    g *= abs(dot(n0, d));
+    g *= abs(dot(n1, d));
+	return g;
+}
+
+void shadeBDPTImagePlane()
+{
+	uint x = gl_GlobalInvocationID.x;
+	uint y = gl_GlobalInvocationID.y;
+		
+	vec2 sample2d = sample2DPoint();
+	vec2 random = sample2DPoint(sampling.random_input_2);
+	
+	vec3 pixel = active_camera.bottom_left + (x + sample2d.x) * active_camera.axis_x_scaled + (y + sample2d.y) * active_camera.axis_y_scaled;
+	
+	int random_sample = int(samples_per_light * random.x);
+	int i = int(num_lights * random.y);
+	
+	vec4 color = vec4(0);
+	
+	for(int j = 0; j < bounces_per_path; ++j)
+	{
+		LightBounce light_bounce = lightBounces.data[random_sample * num_lights + i + buffer_offset * j];
+		if(light_bounce.intersection.barycentric.x == -1)
+		{
+			continue;
+		}
+		
+		vec3 pos 			= light_bounce.ray.origin.xyz;
+		
+		Ray visibility_test;
+		
+		visibility_test.origin = vec4(pixel, 1);
+		visibility_test.direction = vec4(pos + debug.bias * light_bounce.ray.direction.xyz - pixel, 0);
+		
+		float t = length(visibility_test.direction);
+		visibility_test.direction = normalize(visibility_test.direction);
+		
+		if (!intersectsAnyWithLights(visibility_test, t, -1)) {
+			// vec3 p_min = active_camera.bottom_left;
+			// vec3 p_max = p_min + screen.height * active_camera.axis_y_scaled + screen.width * active_camera.axis_x_scaled;
+			// p_min /= p_min.z;
+			// p_max /= p_max.z;
+			// float a = abs((p_max.x - p_min.x) * (p_max.y - p_min.y));
+			float a = length(cross(screen.height * active_camera.axis_y_scaled, screen.width * active_camera.axis_x_scaled));
+			
+			vec3 camera_normal = normalize(cross(active_camera.axis_y_scaled, active_camera.axis_x_scaled));
+			
+			float cos_theta = dot(camera_normal, visibility_test.direction.xyz);
+
+			float we = 1.f / (a * cos_theta * cos_theta * cos_theta * cos_theta);
+			
+			float npdf = (t * t) / abs(dot(camera_normal, visibility_test.direction.xyz));
+			if (cos_theta <= 0) {
+				we = 0;
+			}
+			
+			// t is the length of visibility_test (shadow ray)
+			//Recalculate theoretical light amount with the new output direction.
+			vec3 evaluated = vec3(1,1,1);//evaluateLight(light_bounce.intersection, -visibility_test.direction.xyz, -light_bounce.ray.direction.xyz);
+
+			//Take raw incoming light amount at hit point. (not altered by the bsdf as we need to sample it with a different outgoing ray direction).
+			//Clamping reduces fireflies by a lot.
+			vec3 result_color = light_bounce.hit_color.rgb * evaluated * vec3(we, we, we) / npdf;
+
+			// if(length(light_bounce.hit_color) < 0.0f){
+				// color += vec4(1, 0, 0, 1);
+			// }
+			// else if(length(light_bounce.hit_color) == 0.0f){
+				// color += vec4(0, 1, 0, 1);
+			// }
+			// else if(length(light_bounce.hit_color) > 0.0f){
+				// color += vec4(0, 0, 1, 1);
+			// }
+			// else if(isnan(length(light_bounce.hit_color))){
+				// color += vec4(1);
+			// }
+			// else if(isinf(length(light_bounce.hit_color))){
+				// color += vec4(1, 1, 0, 1);
+			// }
+			color += vec4(result_color, 1.0f) / (j + 1);
+			//weigh by ray angle and new pdf.
+		}
+	}
+	bounces.data[pixelToLinear(x, y)].color += color;
+}
+
+void shade()
+{
+    uint x = gl_GlobalInvocationID.x;
+	
+	if(x >= debug.invocation_count)
+		return;
+	
+	IntersectionRay interRay = intersectionRays.data[x];
+
+	Intersection intersection = interRay.intersection;
+	
+	uint linearID = pixelToLinear(intersection.pixel.x, intersection.pixel.y);
+
+	bool found_intersection = intersection.barycentric.x != -1 ;
+
+	// Add background light or emitted light if this is the first hit or if the last (!) hit was a specular surface
+	if (!found_intersection)
+	{
+		//Calculate how many times the background color should be sampled.
+		bounces.data[linearID].color += vec4(bounces.data[linearID].light_weight.xyz * sampleEnvironment(interRay.ray.direction.xyz).xyz, 1.f);
+		return;
+	}
+
+	if(intersection.barycentric.x == -2)
+	{
+		bounces.data[linearID].color += vec4(bounces.data[linearID].light_weight.xyz * sampleLightSource(interRay.ray.direction.xyz, interRay.ray.origin.xyz, intersection.t, int(intersection.barycentric.y)), 1.f);
+		intersectionRays.data[x].intersection.barycentric.x = -1;
+		return;
+	}
+	
+	//Get data from intersection
+	Triangle tri 		= triangleOf(intersection);
+	vec3 pos 			= fromBarycentric(intersection.barycentric, vertices.data, tri).xyz;
+	vec3 normal 		= fromBarycentric(intersection.barycentric, normals.data, tri).xyz;
+	vec2 uv 			= fromBarycentric(intersection.barycentric, uvs.data, tri);
+	Material material 	= materialOf(tri);
+	vec2 sample2d 		= sample2DPoint();
+			
+	//Ambient lighting
+	bounces.data[linearID].color += vec4(bounces.data[linearID].light_weight.xyz * environment.ambient.xyz * evaluateLight(intersection, normal, normal).xyz * ONE_OVER_PI, 1.f);
+
+	/*bounces.data[linearID].color.xyz = material.diffuse.base.rgb;
+	intersectionRays.data[x].intersection.barycentric.x = -1;
+	return;*/
+
+
+	//#########################################LIGHT#################################################
+	if(sampling.is_bidirectional){
+		vec2 random = sample2DPoint(sampling.random_input_2);
+		int random_sample = int(samples_per_light * random.x);
+		int i = int(num_lights * random.y);
+		for(int j = 0; j < bounces_per_path; ++j)
+		{
+			LightBounce light_bounce = lightBounces.data[random_sample * num_lights + i + buffer_offset * j];
+			if(light_bounce.intersection.barycentric.x == -1)
+			{
+				continue;
+			}
+			vec3 lightPos;
+			vec3 tempPos = j == 0 ? light_bounce.ray.origin.xyz : fromBarycentric(light_bounce.intersection.barycentric, vertices.data, triangleOf(light_bounce.intersection)).xyz;
+			vec3 dirToLight = tempPos - pos;
+
+			// This does work, but temporarily disabled because I have doubts that it is "more correct"
+			/*if(light_bounce.transparent > 0)
+			{
+				lightPos = tempPos - debug.bounce_bias * normalize(dirToLight);
+			}
+			else
+			{*/
+				lightPos = tempPos - debug.bounce_bias * light_bounce.ray.direction.xyz;
+
+			//}
+			dirToLight = lightPos - pos;
+			float dist = light_bounce.base_color.a + distance(tempPos, pos);
+			float attenuation = 1;// / (1 + dist * light_bounce.att_lin + dist * dist * light_bounce.att_quad);
+			
+			//vec3 light_normal = fromBarycentric(light_bounce.intersection.barycentric, normals.data, triangleOf(light_bounce.intersection)).xyz;
+			
+			vec3 light_color = j == 0 ? angularAttenuation(light_bounce.light_index, dirToLight) * light_bounce.base_color.rgb : light_bounce.base_color.rgb /* * geometryTerm(lightPos, pos, light_normal, normal) */;
+					
+			///// shadow test /////
+			// There is always a shadow where the light attenuation is too low.
+			// we check now if there is another hit in light direction after the intersection
+			// If so, we should see a shadow
+			Ray shadowRay;
+			shadowRay.origin.xyz = pos + debug.bias * normal;
+			shadowRay.direction.xyz = normalize(lightPos - pos);
+
+			//Shadow test
+			if (!intersectsAnyWithLights(shadowRay, length(lightPos - shadowRay.origin.xyz), -1))
+			{
+				//First, just the calculation for the light.
+				light_color.rgb = attenuation * light_color.rgb * abs(dot(shadowRay.direction.xyz, normal));
+				//vec3 light_color = light.color.rgb * abs(dot(shadowRay.direction.xyz, normal));
+
+				//Then evaluate the bsdf.
+				light_color *= evaluateLight(intersection, -interRay.ray.direction.xyz, shadowRay.direction.xyz); // TODO: CHECK THIS?
+
+				bounces.data[linearID].color += vec4(light_bounce.hit_color.rgb * light_color * bounces.data[linearID].light_weight, 1.f)/(j + 1 + debug.bounce);
+				
+			}
+		}
+	} 
+	else if(num_lights > 0)
+	{
+		vec2 random = sample2DPoint(sampling.random_input_2);
+		int lightIndex = int(num_lights * random.x);
+		vec3 lightPos;
+		vec3 dirToLight;
+		float attenuation;
+		vec3 light_color;
+		calcLightParams(lightIndex, pos, sample2d, light_color, lightPos, dirToLight, attenuation);
+
+		///// shadow test /////
+		// There is always a shadow where the light attenuation is too low.
+		// we check now if there is another hit in light direction after the intersection
+		// If so, we should see a shadow
+		Ray shadowRay;
+		shadowRay.direction.xyz = normalize(lightPos - pos);
+		shadowRay.origin.xyz = pos + debug.bias * faceforward(normal, -shadowRay.direction.xyz, normal);
+
+		if((light_color.r > 0) || (light_color.g > 0) || (light_color.b > 0))
+		{
+			light_color *= attenuation * evaluateLight(intersection, shadowRay.direction.xyz, -interRay.ray.direction.xyz) * abs(dot(shadowRay.direction.xyz, normal));
+		
+			if((light_color.r > 0) || (light_color.g > 0) || (light_color.b > 0))
+			{
+				// TODO: If that is commented in, there are some weird artifacts.
+				light_color *= intersectsAnyWithLights(shadowRay, length(lightPos - shadowRay.origin.xyz), lightIndex) ? 0 : 1;
+			}
+		}
+		bounces.data[linearID].color += vec4(bounces.data[linearID].light_weight * light_color, 1.f);
+	}
+	//#########################################LIGHT#################################################
+
+
+	// reflected/refracted ray
+	vec3 result_direction;
+
+	// probability distribution function
+	float pdf;
+	int mat_flags = 0;
+	vec3 contribution = reflectance(intersection, -normalize(interRay.ray.direction.xyz), normal, result_direction, pdf, mat_flags, sample2d); // Sample bsdf
+	
+	if (contribution == vec3(0.f) || pdf == 0/*pdf <= debug.min_pdf*/)
+	{
+		intersectionRays.data[x].intersection.barycentric.x = -1;
+		return;
+	}
+
+	bool is_emissive_hit = (mat_flags & MATFLAG_EMISSIVE_BOUNCE) == MATFLAG_EMISSIVE_BOUNCE; //Uses mat_flags of THIS bounce
+
+	int last_mat_flags = bounces.data[linearID].mat_flags;
+	bool was_specular_bounce = (last_mat_flags & MATFLAG_SPECULAR_BOUNCE) == MATFLAG_SPECULAR_BOUNCE; //Uses mat_flags of LAST bounce
+	// TODO: How and why to consider a specular bounce? Every previous bounce should be able to receive and carry the emitted light.
+	// If considered, a BSDF that is expected not to have specular bounces (like transparentBSDF) will show the emissive object as being non-emissive. Make all materials specular?
+	
+	if (is_emissive_hit) {
+		bounces.data[linearID].color += vec4(bounces.data[linearID].light_weight.xyz * getMaterialColorParam(material.emission, uv).xyz, 0.f);
+		intersectionRays.data[x].intersection.barycentric.x = -1;
+
+		//Return here. After an emissive hit, it's considered as a light source.
+		return;
+	}
+
+	bounces.data[linearID].light_weight *= contribution * abs(dot(result_direction, normal)) / pdf; // Accumulate indirect lighting and divide by pdf to remove bias
+	bounces.data[linearID].mat_flags = mat_flags;
+
+	Ray ray;
+	// offset for specular case
+	vec3 offset = debug.bounce_bias * result_direction; //1e-4f is bounce bias
+	
+	// If it was not a specular bounce, we optimise the offset for that case 
+	if((mat_flags & MATFLAG_SPECULAR_BOUNCE) != MATFLAG_SPECULAR_BOUNCE){
+		offset = debug.bounce_bias * normal;
+		offset = faceforward(-offset, normal, result_direction);
+	}
+
+	ray.origin = vec4(pos + offset, 0);
+	ray.direction = vec4(result_direction, 0);
+	ray.pixel = intersection.pixel;
+
+	Intersection newIntersection;
+	newIntersection.mat_flags = mat_flags;
+	
+	interRay.ray = ray;
+	interRay.intersection = newIntersection;
+	intersectionRays.data[x] = interRay;
+}
+
+#endif //__PT_SHADE_COMPUTE

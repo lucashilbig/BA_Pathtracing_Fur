@@ -1,0 +1,27 @@
+#ifndef __PT_GEN_PRIMARIES_COMPUTE
+#define __PT_GEN_PRIMARIES_COMPUTE
+
+#include "include/inc_camera.compute"
+#include "include/inc_intersectionRayStructs.compute"
+
+#include "Pathtracer/pt_input.compute"
+
+void generatePrimaries()
+{
+    uint x = gl_GlobalInvocationID.x;
+    uint y = gl_GlobalInvocationID.y;
+	
+	if(x >= screen.width || y >= screen.height){
+		return;
+	}
+	
+	bounces.data[pixelToLinear(x, y)].light_weight = vec3(1);
+
+	//Map [-1, 1] points to [-0.5, 0.5]
+	vec2 points = sample2DPoint();
+	intersectionRays.data[pixelToLinear(x, y)].ray = shootRay(x, y, points.x, points.y);
+	Intersection intersection;
+	intersectionRays.data[pixelToLinear(x, y)].intersection = intersection;
+}
+
+#endif //__PT_GEN_PRIMARIES_COMPUTE
