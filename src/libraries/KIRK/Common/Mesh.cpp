@@ -1,10 +1,10 @@
 #include "Mesh.h"
 
-std::vector<KIRK::Mesh> KIRK::Mesh::separateByMaterial() const 
+std::vector<KIRK::Mesh> KIRK::Mesh::separateByMaterial() const
 {
 	std::vector<KIRK::Mesh> separate_meshes;
 
-	if (m_materials.size() <= 1) 
+	if (m_materials.size() <= 1)
 	{
 		// Don't run if there is already only one material.
 		separate_meshes.push_back(*this);
@@ -16,9 +16,9 @@ std::vector<KIRK::Mesh> KIRK::Mesh::separateByMaterial() const
 
 	//Go through faces and determine the border indices for the materials
 	int material_index = 0;
-	for (Mesh::face face : m_faces) 
+	for (std::shared_ptr<Mesh::face> face : m_faces)
 	{
-		if (face.material_index >= separate_meshes.size())
+		if (face->material_index >= separate_meshes.size())
 		{
 			//If the material index is >= the mesh count, we increase it and see it as a "new" material mesh zone.
 			Mesh mesh;
@@ -35,22 +35,22 @@ std::vector<KIRK::Mesh> KIRK::Mesh::separateByMaterial() const
 	unsigned int index_offset = 0;
 	int vertex_offset = 0;
 
-	for (int m = 0; m<indices_per_material.size(); m++) 
+	for (int m = 0; m < indices_per_material.size(); m++)
 	{
 		vertices_per_material.push_back(0);
 
-		vertex_offset += m>0 ? vertices_per_material[m - 1] : 0;
+		vertex_offset += m > 0 ? vertices_per_material[m - 1] : 0;
 
 		//Reserve needed space.
 		separate_meshes[m].m_indices.reserve(indices_per_material[m]);
 		separate_meshes[m].m_faces.reserve(indices_per_material[m] / 3);
 
-		for (int f = index_offset; f<index_offset + indices_per_material[m] / 3; f++) 
+		for (int f = index_offset; f < index_offset + indices_per_material[m] / 3; f++)
 		{
 			//Push indices to separated material.
-			unsigned int index_a = m_faces[f].vertex_index_a - vertex_offset;
-			unsigned int index_b = m_faces[f].vertex_index_b - vertex_offset;
-			unsigned int index_c = m_faces[f].vertex_index_c - vertex_offset;
+			unsigned int index_a = m_faces[f]->vertex_index_a - vertex_offset;
+			unsigned int index_b = m_faces[f]->vertex_index_b - vertex_offset;
+			unsigned int index_c = m_faces[f]->vertex_index_c - vertex_offset;
 
 			vertices_per_material[m] = glm::max(vertices_per_material[m], index_a, index_b, index_c);
 
@@ -63,7 +63,7 @@ std::vector<KIRK::Mesh> KIRK::Mesh::separateByMaterial() const
 		//Reserve needed space.
 		separate_meshes[m].m_vertices.reserve(vertices_per_material[m] + 1);
 
-		for (int v = vertex_offset; v<vertex_offset + vertices_per_material[m] + 1; v++) 
+		for (int v = vertex_offset; v < vertex_offset + vertices_per_material[m] + 1; v++)
 		{
 			//Push vertices to separated material.
 			separate_meshes[m].m_vertices.push_back(m_vertices[v]);
@@ -77,4 +77,48 @@ std::vector<KIRK::Mesh> KIRK::Mesh::separateByMaterial() const
 	}
 
 	return separate_meshes;
+}
+
+void KIRK::Mesh::changeToFurFaces(unsigned int num_fiber_verts, float fiber_radius)
+{
+	//check if radius is > 0
+	if (fiber_radius <= 0) {
+		LOG_ERRORs() << "changeToFurFaces() : Radius has to be > 0";
+		return;
+	}
+
+	//Iterate over every face in the mesh
+	for (int f = 0; f < m_faces.size(); f++) {
+		//create furFace and add data from face
+		furFace furFace;
+		furFace.vertex_index_a = m_faces[f]->vertex_index_a;
+		furFace.vertex_index_b = m_faces[f]->vertex_index_b;
+		furFace.vertex_index_c = m_faces[f]->vertex_index_c;
+		furFace.material_index = m_faces[f]->material_index;
+		//compute center of the face as fiber start position
+		glm::vec3 pos = (m_vertices[furFace.vertex_index_a].position + m_vertices[furFace.vertex_index_b].position
+					     + m_vertices[furFace.vertex_index_c].position) / 3.0f;
+		//compute centered normal for the direction in which the fiber is headed
+		glm::vec3 dir = (m_vertices[furFace.vertex_index_a].normal + m_vertices[furFace.vertex_index_b].normal
+						+ m_vertices[furFace.vertex_index_c].normal) / 3.0f;
+		//Add fiber start position and radius to the furFace
+		furFace.fiber_position.push_back(pos);
+		furFace.fiber_radius.push_back(fiber_radius);
+
+		
+		for (int i = 1; i < num_fiber_verts; i++) {
+			//compute new position of fiber vertice
+			glm::vec3 point = pos + dir * 0.02f;
+			//Add position and radius to furFace;
+			furFace.fiber_position.push_back(point);
+			furFace.fiber_radius.push_back(fiber_radius);
+			//change pos to new vertice pos
+			pos = point;
+		}
+		//change the radius of the last vertice to 0
+		furFace.fiber_radius.back() = 0.0f;
+
+		//change m_faces pointer to the new furFace
+		m_faces[f] = std::make_shared<KIRK::Mesh::furFace>(furFace);
+	}
 }

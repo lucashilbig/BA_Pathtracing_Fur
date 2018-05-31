@@ -211,7 +211,7 @@ KIRK::Mesh* KIRK::SceneGraph::createMeshFromAi(const aiScene* scene, aiNode* nod
                 mesh->m_indices.push_back(idx_a);
                 mesh->m_indices.push_back(idx_b);
                 mesh->m_indices.push_back(idx_c);
-                mesh->m_faces.push_back(face);
+                mesh->m_faces.push_back(std::make_shared<KIRK::Mesh::face>(face));
             }
         }
 

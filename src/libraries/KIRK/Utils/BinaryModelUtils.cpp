@@ -106,7 +106,7 @@ std::shared_ptr<KIRK::Mesh> KIRK::loadBinaryGeometry(std::string path)
 			face.vertex_index_b = geometry->m_indices[i + 1];
 			face.vertex_index_c = geometry->m_indices[i + 2];
 			face.material_index = mData[i / 3]; //old binary file => every material_index = 0
-			geometry->m_faces.push_back(face);
+			geometry->m_faces.push_back(std::make_shared<KIRK::Mesh::face>(face));
 		}
 		delete[] vData;
 		delete[] iData;
@@ -163,7 +163,7 @@ std::shared_ptr<KIRK::Mesh> KIRK::loadBinaryGeometry(std::string path)
 			face.vertex_index_b = geometry->m_indices[i + 1];
 			face.vertex_index_c = geometry->m_indices[i + 2];
 			face.material_index = matIndices[i / 3];
-			geometry->m_faces.push_back(face);
+			geometry->m_faces.push_back(std::make_shared<KIRK::Mesh::face>(face));
 		}
 	}
 
@@ -198,7 +198,7 @@ int KIRK::writeBinaryGeometry(std::string path, const KIRK::Mesh *geom, bool inv
 	}
 	for (int t = 0; t < numFaces; t++)
 	{
-		matIndices.push_back(geom->m_faces[t].material_index);
+		matIndices.push_back(geom->m_faces[t]->material_index);
 	}
 
 	//do write

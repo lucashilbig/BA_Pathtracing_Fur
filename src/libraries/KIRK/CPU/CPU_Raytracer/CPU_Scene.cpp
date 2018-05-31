@@ -75,21 +75,21 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 			//Go over every face
 			for(int f = 0; f < mesh->m_faces.size(); f++)
 			{
-				KIRK::Mesh::face face = mesh->m_faces[f];
+				KIRK::Mesh::face *face = mesh->m_faces[f].get();
 				//Converte the meshstructure to the CV::TriangleStructure with transformation
                 Triangle *tri = new Triangle(
-                    glm::vec3(base_transform * child->m_transform * glm::vec4(mesh->m_vertices[face.vertex_index_a].position, 1)),
-                    glm::vec3(base_transform * child->m_transform * glm::vec4(mesh->m_vertices[face.vertex_index_b].position, 1)),
-                    glm::vec3(base_transform * child->m_transform * glm::vec4(mesh->m_vertices[face.vertex_index_c].position, 1)),
-                    glm::normalize(glm::vec3(glm::transpose(glm::inverse(base_transform * child->m_transform)) * glm::vec4(mesh->m_vertices[face.vertex_index_a].normal, 0))),
-					glm::normalize(glm::vec3(glm::transpose(glm::inverse(base_transform * child->m_transform)) * glm::vec4(mesh->m_vertices[face.vertex_index_b].normal, 0))),
-					glm::normalize(glm::vec3(glm::transpose(glm::inverse(base_transform * child->m_transform)) * glm::vec4(mesh->m_vertices[face.vertex_index_c].normal, 0))),
-					mesh->m_vertices[face.vertex_index_a].texcoord,
-					mesh->m_vertices[face.vertex_index_b].texcoord,
-					mesh->m_vertices[face.vertex_index_c].texcoord);
+                    glm::vec3(base_transform * child->m_transform * glm::vec4(mesh->m_vertices[face->vertex_index_a].position, 1)),
+                    glm::vec3(base_transform * child->m_transform * glm::vec4(mesh->m_vertices[face->vertex_index_b].position, 1)),
+                    glm::vec3(base_transform * child->m_transform * glm::vec4(mesh->m_vertices[face->vertex_index_c].position, 1)),
+                    glm::normalize(glm::vec3(glm::transpose(glm::inverse(base_transform * child->m_transform)) * glm::vec4(mesh->m_vertices[face->vertex_index_a].normal, 0))),
+					glm::normalize(glm::vec3(glm::transpose(glm::inverse(base_transform * child->m_transform)) * glm::vec4(mesh->m_vertices[face->vertex_index_b].normal, 0))),
+					glm::normalize(glm::vec3(glm::transpose(glm::inverse(base_transform * child->m_transform)) * glm::vec4(mesh->m_vertices[face->vertex_index_c].normal, 0))),
+					mesh->m_vertices[face->vertex_index_a].texcoord,
+					mesh->m_vertices[face->vertex_index_b].texcoord,
+					mesh->m_vertices[face->vertex_index_c].texcoord);
 
-                m_materials.push_back(mesh->m_materials[face.material_index]);
-				tri->setMaterial(mesh->m_materials[face.material_index].get());
+                m_materials.push_back(mesh->m_materials[face->material_index]);
+				tri->setMaterial(mesh->m_materials[face->material_index].get());
 
 				m_scene_objects.push_back(tri);
 			}
