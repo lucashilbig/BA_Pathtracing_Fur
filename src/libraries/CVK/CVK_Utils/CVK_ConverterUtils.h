@@ -11,6 +11,7 @@
 #include <CVK/CVK_2/CVK_Material.h>
 #include <CVK/CVK_2/CVK_FreeFlight.h>
 #include <CVK/CVK_2/CVK_Trackball.h>
+#include <CVK/CVK_2/CVK_LineList.h>
 #include "KIRK/Common/Ray.h"
 
 namespace CVK

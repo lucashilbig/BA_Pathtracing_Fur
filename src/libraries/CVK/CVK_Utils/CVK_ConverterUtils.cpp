@@ -229,7 +229,34 @@ namespace CVK
 				mesh_node->setModelMatrix(transform);
 				mesh_node->setMaterial(material);
 
+				//Push node with mesh geometry
 				m_nodes.push_back(mesh_node);
+
+				//If we have fur fiber information in KIRK::Mesh, we add a LineList Geometry to CVK scene. This contains every fiber in the mesh as a line
+				if (!mesh.m_furFaces.empty()) {
+					//Node and geometry as LineList
+					std::shared_ptr<CVK::Node> fur_node = std::make_shared<CVK::Node>("LineList_Node");
+					std::shared_ptr<CVK::LineList> fur_geometry = std::make_shared<CVK::LineList>();
+					//Init the LineList once
+					fur_geometry->init_LineList();
+
+					//Iterate over every face in the mesh
+					for (int i = 0; i < mesh.m_furFaces.size(); i++) {
+						//Iterate over the fiber positions in the face
+						for (int j = 0; j < mesh.m_furFaces[i].fiber_positions.size() - 1; j++) {
+							//Add the Lines of the current fur fiber to the LineList
+							fur_geometry->add_Line(mesh.m_furFaces[i].fiber_positions[j], mesh.m_furFaces[i].fiber_positions[j+1], glm::vec3(255.0f, 0.0f, 0.0f));
+						}
+					}
+
+					//Finish the LineList
+					fur_geometry->finish_LineList();
+					//Assign LineList to node
+					fur_node->setGeometry(fur_geometry);
+					fur_node->setModelMatrix(transform);
+					//Push node with LineList to m_nodes
+					m_nodes.push_back(fur_node);
+				}
 			}
 		}
 
