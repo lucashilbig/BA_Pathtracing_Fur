@@ -224,6 +224,9 @@ int main(int argc, char *argv[])
 		RESOURCES_PATH "/cubeMap/negy.jpg",
 		RESOURCES_PATH "/cubeMap/negz.jpg");
 
+	//Apply fur on every triangle in the scene. For testing purpose.
+	scene->addFurFibersToAllMeshes(8, 0.5f);
+
 	//////////////////////////////////////////////
 	//
 	//  General stuff

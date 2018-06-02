@@ -630,7 +630,7 @@ std::vector<std::shared_ptr<KIRK::Mesh>>& operator<<(std::vector<std::shared_ptr
                         mesh->m_indices.push_back(idx_a);
                         mesh->m_indices.push_back(idx_b);
                         mesh->m_indices.push_back(idx_c);
-                        mesh->m_faces.push_back(std::make_shared<KIRK::Mesh::face>(face));
+                        mesh->m_faces.push_back(face);
                     }
                 }
 

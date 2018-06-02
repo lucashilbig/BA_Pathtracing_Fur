@@ -41,6 +41,8 @@ namespace KIRK
 		/**Checks, whether the given string ends with the given ending.*/
         static bool endsWith(std::string const &fullString, std::string const &ending);
 
+
+
 		/**Default constructor. Just add a root node and no default lights, cameras or environment.*/
         SceneGraph();
 
@@ -60,6 +62,13 @@ namespace KIRK
 		Creates a default environment having KIRK::Color::SKY_BLUE as color.
 		*/
         void createDefaultEnvironment();
+
+		/**
+		Iterates over every Mesh and adds fur fiber information to every face in the meshes.
+		@param num_fiber_verts amount of vertices if which the fiber consists. Also determines the length of the fiber since the distance between each vertice is the same.
+		@param fiber_radius is the radius of the fur fiber. Has to be > 0.
+		*/
+		void addFurFibersToAllMeshes(unsigned int num_fiber_verts, float fiber_radius);
 
 		/**
 		Imports an .obj file as a SceneNode. The resulting SceneNode has a root-node structure where each child of the returned node is a parent node to a mesh node.

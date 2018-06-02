@@ -211,7 +211,7 @@ KIRK::Mesh* KIRK::SceneGraph::createMeshFromAi(const aiScene* scene, aiNode* nod
                 mesh->m_indices.push_back(idx_a);
                 mesh->m_indices.push_back(idx_b);
                 mesh->m_indices.push_back(idx_c);
-                mesh->m_faces.push_back(std::make_shared<KIRK::Mesh::face>(face));
+                mesh->m_faces.push_back(face);
             }
         }
 
@@ -310,6 +310,14 @@ void KIRK::SceneGraph::createDefaultEnvironment()
 	//Use a light blue colored background as default-
     m_environment = std::unique_ptr<Environment>(new Environment());
     m_environment->setColor(Color::RGBA(0.7f, 0.9f, 1.f, 1.f));
+}
+
+void KIRK::SceneGraph::addFurFibersToAllMeshes(unsigned int num_fiber_verts, float fiber_radius)
+{	
+	for (auto sceneNode : getRootNode()->m_children) {
+		if (sceneNode->m_data_type == KIRK::SceneNode::MESH)
+			std::dynamic_pointer_cast<KIRK::Mesh>(sceneNode->m_data_object)->addFurToFaces(num_fiber_verts, fiber_radius);
+	}
 }
 
 ////////////////////////////////////////////////////////////

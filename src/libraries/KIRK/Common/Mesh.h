@@ -39,10 +39,11 @@ namespace KIRK
 		In Adition each vertice has a radius which determines the width of the fur fiber at that point.
 		The radius of the last vertice is always 0.
 		*/
-		struct furFace : KIRK::Mesh::face	//TODO: Fur Geometry implementation
+		struct furFace	//TODO: Fur Geometry implementation
 		{
-			std::vector<glm::vec3> fiber_position;
-			std::vector<unsigned float> fiber_radius;
+			unsigned int face_index;	//Index of the face in m_faces for which the fur informations are.
+			std::vector<glm::vec3> fiber_positions;
+			std::vector<float> fiber_radius;
 		};
 
 		virtual ~Mesh() {}
@@ -54,17 +55,18 @@ namespace KIRK
 		std::vector<Mesh> separateByMaterial() const;
 
 		/**
-		Changes the faces in m_faces from Mesh::face to Mesh::furFace therefor adding fur fibers to the faces.
+		Adds fur fiber Information for every face in m_faces and saves them in m_furFaces.
 		This will add fiber_position and fiber_radius at the center of the face pointing in the normals direction.
 		@param num_fiber_verts amount of vertices if which the fiber consists. Also determines the length of the fiber since the distance between each vertice is the same.
 		@param fiber_radius is the radius of the fur fiber. Has to be > 0.
 		*/
-		void changeToFurFaces(unsigned int num_fiber_verts, float fiber_radius);
+		void addFurToFaces(unsigned int num_fiber_verts, float fiber_radius);
 
         std::vector<vertex> m_vertices;			//!< All vertices contained in this mesh.
         std::vector<unsigned int> m_indices;	//!< The indices in this mesh, sorted like Triangles as they should be for OpenGL rendering.
         std::vector<std::shared_ptr<Material>> m_materials;		//!< All materials this mesh uses.
-        std::vector<std::shared_ptr<face>> m_faces;				//!< The triangles this mesh consists of.
+        std::vector<face> m_faces;				//!< The triangles this mesh consists of.
+		std::vector<furFace> m_furFaces;		//!< The fur fiber information for each face (triangle).
 
     };
 }
