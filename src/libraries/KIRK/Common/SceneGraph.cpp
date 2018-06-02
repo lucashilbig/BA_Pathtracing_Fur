@@ -314,7 +314,7 @@ void KIRK::SceneGraph::createDefaultEnvironment()
 
 void KIRK::SceneGraph::addFurFibersToAllMeshes(unsigned int num_fiber_verts, float fiber_radius)
 {	
-	for (auto sceneNode : getRootNode()->m_children) {
+	for each (auto sceneNode in *this) {
 		if (sceneNode->m_data_type == KIRK::SceneNode::MESH)
 			std::dynamic_pointer_cast<KIRK::Mesh>(sceneNode->m_data_object)->addFurToFaces(num_fiber_verts, fiber_radius);
 	}
