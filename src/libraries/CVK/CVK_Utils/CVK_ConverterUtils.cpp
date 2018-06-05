@@ -245,7 +245,7 @@ namespace CVK
 						//Iterate over the fiber positions in the face
 						for (int j = 0; j < mesh.m_furFaces[i].fiber_positions.size() - 1; j++) {
 							//Add the Lines of the current fur fiber to the LineList
-							fur_geometry->add_Line(mesh.m_furFaces[i].fiber_positions[j], mesh.m_furFaces[i].fiber_positions[j+1], glm::vec3(255.0f, 0.0f, 0.0f));
+							fur_geometry->add_Line(mesh.m_furFaces[i].fiber_positions[j], mesh.m_furFaces[i].fiber_positions[j+1], glm::vec3(0.0f, 255.0f, 0.0f));
 						}
 					}
 

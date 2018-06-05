@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
 	//Loading arguments is just as easy as to have a key char and a default value for when the argument is not set.
 	//CAUTION: Cannot use any const here. So no const char* allowed.
 	//Not important to have optimized const char*'s here for appending RESOURCES_PATH, all this is kind of temporary.
-	std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Table/scene.json"));
+	std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_Testscene/scene.json"));
 	std::string relative_path = arg_map.get('s', std::string(""));
 	unsigned int image_width = arg_map.get('w', 1280);
 	unsigned int image_height = arg_map.get('h', 720);
@@ -225,7 +225,7 @@ int main(int argc, char *argv[])
 		RESOURCES_PATH "/cubeMap/negz.jpg");
 
 	//Apply fur on every triangle in the scene. For testing purpose.
-	scene->addFurFibersToAllMeshes(3, 0.5f);
+	scene->addFurFibersToAllMeshes(5, 0.5f);
 
 	//////////////////////////////////////////////
 	//
