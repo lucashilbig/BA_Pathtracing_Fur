@@ -232,30 +232,46 @@ namespace CVK
 				//Push node with mesh geometry
 				m_nodes.push_back(mesh_node);
 
-				//If we have fur fiber information in KIRK::Mesh, we add a LineList Geometry to CVK scene. This contains every fiber in the mesh as a line
-				if (!mesh.m_furFaces.empty()) {
-					//Node and geometry as LineList
-					std::shared_ptr<CVK::Node> fur_node = std::make_shared<CVK::Node>("LineList_Node");
-					std::shared_ptr<CVK::LineList> fur_geometry = std::make_shared<CVK::LineList>();
-					//Init the LineList once
-					fur_geometry->init_LineList();
+				//////////////////////////////////////////////////////////////////////////////////
+				//
+				// Add CVK::Cone Geometries to the nodes for every fur fiber in the KIRK::Mesh
+				//
+				//////////////////////////////////////////////////////////////////////////////////
 
-					//Iterate over every face in the mesh
-					for (int i = 0; i < mesh.m_furFaces.size(); i++) {
+				
+
+				//If we have fur fiber information in KIRK::Mesh, we add a Cone Geometry for every fiber to CVK scene.
+				if (!mesh.m_furFibers.empty()) {
+					//create different colored materials for every cone that exists in a single fur fiber
+					std::vector<std::shared_ptr<CVK::Material>> materials;
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 0.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// red
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 1.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// green
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 0.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// blue
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 1.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// yellow
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 0.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// magenta
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 1.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// cyan
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 1.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// white
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 0.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// black
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(138.0f / 255.0f, 7.0f / 255.0f, 7.0f / 255.0f), glm::vec3(1.0f), 0.01f, 1.5f));// blood red
+					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.7f, 0.9f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// sky blue
+								
+					//Iterate over every fur fiber in the Mesh
+					for (int i = 0; i < mesh.m_furFibers.size(); i++) {
 						//Iterate over the fiber positions in the face
-						for (int j = 0; j < mesh.m_furFaces[i].fiber_positions.size() - 1; j++) {
-							//Add the Lines of the current fur fiber to the LineList
-							fur_geometry->add_Line(mesh.m_furFaces[i].fiber_positions[j], mesh.m_furFaces[i].fiber_positions[j+1], glm::vec3(0.0f, 255.0f, 0.0f));
+						for (int j = 0; j < mesh.m_furFibers[i].fiber_positions.size() - 1; j++) {
+							//create CVK::Cone geometry with fiber_positions and fiber_radius
+							std::shared_ptr<CVK::Cone> fur_geometry = std::make_shared<CVK::Cone>(mesh.m_furFibers[i].fiber_positions[j], mesh.m_furFibers[i].fiber_positions[j+1],
+								mesh.m_furFibers[i].fiber_radius[j], mesh.m_furFibers[i].fiber_radius[j + 1], 5);
+							//create node for the geometry object
+							std::shared_ptr<CVK::Node> fur_node = std::make_shared<CVK::Node>("ConeFiber_Node");
+							//Assign Cone geometry to node
+							fur_node->setGeometry(fur_geometry);
+							fur_node->setModelMatrix(transform);
+							fur_node->setMaterial(materials[j]);
+							//Push node with Cone geometry to m_nodes
+							m_nodes.push_back(fur_node);
 						}
 					}
-
-					//Finish the LineList
-					fur_geometry->finish_LineList();
-					//Assign LineList to node
-					fur_node->setGeometry(fur_geometry);
-					fur_node->setModelMatrix(transform);
-					//Push node with LineList to m_nodes
-					m_nodes.push_back(fur_node);
 				}
 			}
 		}
