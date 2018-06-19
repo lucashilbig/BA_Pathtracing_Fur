@@ -17,12 +17,12 @@ CVK::CVKCameraSynchronizer::CVKCameraSynchronizer(std::weak_ptr<KIRK::SceneGraph
 		((CVK::FreeFlight*)m_cvk_camera.get())->m_direction = glm::normalize(m_kirk_camera->getLocalLookAt());
 	}
 
-    else if (typeid(*(m_cvk_camera.get())) == typeid(CVK::Trackball))
-    {
-        ((CVK::Trackball*)m_cvk_camera.get())->setUpvector((m_kirk_camera->getLocalUp()));
-        ((CVK::Trackball*)m_cvk_camera.get())->setPosition(m_kirk_camera->getLocalPosition());
-        ((CVK::Trackball*)m_cvk_camera.get())->m_direction = glm::normalize(m_kirk_camera->getLocalLookAt());
-    }
+	else if (typeid(*(m_cvk_camera.get())) == typeid(CVK::Trackball))
+	{
+		((CVK::Trackball*)m_cvk_camera.get())->setUpvector((m_kirk_camera->getLocalUp()));
+		((CVK::Trackball*)m_cvk_camera.get())->setPosition(m_kirk_camera->getLocalPosition());
+		((CVK::Trackball*)m_cvk_camera.get())->m_direction = glm::normalize(m_kirk_camera->getLocalLookAt());
+	}
 
 }
 
@@ -77,7 +77,7 @@ void CVK::CVKCameraSynchronizer::setCVKCamera(std::weak_ptr<KIRK::SceneGraph> sc
 	{
 		((CVK::FreeFlight*)m_cvk_camera.get())->setUpvector(m_kirk_camera->getLocalUp());
 		((CVK::FreeFlight*)m_cvk_camera.get())->setPosition(m_kirk_camera->getLocalPosition());
-		((CVK::FreeFlight*)m_cvk_camera.get())->m_direction= glm::normalize(m_kirk_camera->getLocalLookAt());
+		((CVK::FreeFlight*)m_cvk_camera.get())->m_direction = glm::normalize(m_kirk_camera->getLocalLookAt());
 	}
 	else if (typeid(*(m_cvk_camera.get())) == typeid(CVK::Trackball))
 	{
@@ -234,43 +234,58 @@ namespace CVK
 
 				//////////////////////////////////////////////////////////////////////////////////
 				//
-				// Add CVK::Cone Geometries to the nodes for every fur fiber in the KIRK::Mesh
+				// Add CVK::Cone Geometries to the nodes for every fur fiber(instanced) in the KIRK::Mesh
 				//
 				//////////////////////////////////////////////////////////////////////////////////
 
-				
+
 
 				//If we have fur fiber information in KIRK::Mesh, we add a Cone Geometry for every fiber to CVK scene.
 				if (!mesh.m_furFibers.empty()) {
 					//create different colored materials for every cone that exists in a single fur fiber
-					std::vector<std::shared_ptr<CVK::Material>> materials;
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 0.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// red
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 1.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// green
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 0.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// blue
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 1.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// yellow
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 0.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// magenta
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 1.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// cyan
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 1.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// white
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 0.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// black
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(138.0f / 255.0f, 7.0f / 255.0f, 7.0f / 255.0f), glm::vec3(1.0f), 0.01f, 1.5f));// blood red
-					materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.7f, 0.9f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// sky blue
-								
-					//Iterate over every fur fiber in the Mesh
+					std::vector<std::shared_ptr<CVK::Material>> fiber_materials;
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 0.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// red
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 1.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// green
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 0.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// blue
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 1.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// yellow
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 0.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// magenta
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 1.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// cyan
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(1.f, 1.f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// white
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.f, 0.f, 0.f), glm::vec3(1.0f), 0.01f, 1.5f));// black
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(138.0f / 255.0f, 7.0f / 255.0f, 7.0f / 255.0f), glm::vec3(1.0f), 0.01f, 1.5f));// blood red
+					fiber_materials.push_back(std::make_shared<CVK::Material>(glm::vec3(0.7f, 0.9f, 1.f), glm::vec3(1.0f), 0.01f, 1.5f));// sky blue
+
+					//Parent Node for all fiber_ConeGeometry_Nodes
+					std::shared_ptr<CVK::Node> fiber_node = std::make_shared<CVK::Node>("Fiber_Node");
+
+					//Iterate once over all fiber positions of one fiber and create a node with geometry for every cone
+					for (int j = 0; j < mesh.m_furFibers[0].fiber_positions.size() - 1; j++) {
+						//create CVK::Cone geometry with fiber_positions and fiber_radius
+						std::shared_ptr<CVK::Cone> fur_geometry = std::make_shared<CVK::Cone>(mesh.m_furFibers[0].fiber_positions[j], mesh.m_furFibers[0].fiber_positions[j + 1],
+							mesh.m_furFibers[0].fiber_radius[j], mesh.m_furFibers[0].fiber_radius[j + 1], 5);
+						//create node for the geometry object
+						std::shared_ptr<CVK::Node> cone_node = std::make_shared<CVK::Node>("Fiber_ConeGeometry_Node");
+						//Assign Cone geometry to node
+						cone_node->setGeometry(fur_geometry);
+						cone_node->setMaterial(fiber_materials[(j < fiber_materials.size()) ? j : 0]);
+						//Add cone_node to parent node
+						fiber_node->addChild(cone_node);
+					}
+					//Now iterate over every fur fiber in the Mesh
 					for (int i = 0; i < mesh.m_furFibers.size(); i++) {
-						//Iterate over the fiber positions in the face
-						for (int j = 0; j < mesh.m_furFibers[i].fiber_positions.size() - 1; j++) {
-							//create CVK::Cone geometry with fiber_positions and fiber_radius
-							std::shared_ptr<CVK::Cone> fur_geometry = std::make_shared<CVK::Cone>(mesh.m_furFibers[i].fiber_positions[j], mesh.m_furFibers[i].fiber_positions[j+1],
-								mesh.m_furFibers[i].fiber_radius[j], mesh.m_furFibers[i].fiber_radius[j + 1], 5);
-							//create node for the geometry object
-							std::shared_ptr<CVK::Node> fur_node = std::make_shared<CVK::Node>("ConeFiber_Node");
-							//Assign Cone geometry to node
-							fur_node->setGeometry(fur_geometry);
-							fur_node->setModelMatrix(transform);
-							fur_node->setMaterial(materials[j]);
-							//Push node with Cone geometry to m_nodes
-							m_nodes.push_back(fur_node);
-						}
+						//Instancing node for fur fibers. They get the node with the geometry as child and only change the transformation matrix for the new fiber position
+						std::shared_ptr<CVK::Node> fiber_inst_node = std::make_shared<CVK::Node>("Fiber_Instancing_Node");
+						//add the parent node(with geometries stored) as child
+						fiber_inst_node->addChild(fiber_node);
+						//calculate translation vector. Since our geometry is created at the position of the first fiber in our mesh 
+						//we have to use the difference between the first fiber and the current fiber. Also we only need to use the start positions of the fiber.
+						glm::vec3 trans_vec = mesh.m_furFibers[i].fiber_positions[0] - mesh.m_furFibers[0].fiber_positions[0];
+						//Now calculate the actual transformation matrix with the meshes matrix as base and our translation vector on top of that
+						glm::mat4 trans_mat = glm::translate(transform, trans_vec);
+						//set transformation matrix for current fiber
+						fiber_inst_node->setModelMatrix(trans_mat);
+						//Push node to all other scene nodes
+						m_nodes.push_back(fiber_inst_node);						
 					}
 				}
 			}
