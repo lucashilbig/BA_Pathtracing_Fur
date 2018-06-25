@@ -91,14 +91,14 @@ void CVK::CVKCameraSynchronizer::setCVKCamera(std::weak_ptr<KIRK::SceneGraph> sc
 namespace CVK
 {
 
-	std::shared_ptr<CVK::Node> CVK::SceneToCVK::exportScene(std::shared_ptr<KIRK::SceneGraph> sceneGraph)
+	std::shared_ptr<CVK::Node> CVK::SceneToCVK::exportScene(std::shared_ptr<KIRK::SceneGraph> sceneGraph, bool showLightGeometry)
 	{
 		LOG_DEBUG("Exporting scene to CVK::Node...");
 
-		return toCVKNode(sceneGraph->getRootNode())[0];
+		return toCVKNode(sceneGraph->getRootNode(), showLightGeometry)[0];
 	}
 
-	std::vector<std::shared_ptr<CVK::Node>> CVK::SceneToCVK::toCVKNode(const std::shared_ptr<KIRK::SceneNode> sceneNode)
+	std::vector<std::shared_ptr<CVK::Node>> CVK::SceneToCVK::toCVKNode(const std::shared_ptr<KIRK::SceneNode> sceneNode, bool showLightGeometry)
 	{
 		std::vector<std::shared_ptr<CVK::Node>> m_nodes;
 
@@ -139,10 +139,30 @@ namespace CVK
 
 				//We also put in our light sources, all as being point lights.
 				CVK::State::getInstance()->addLight(cvk_light);
+
+				//Render sphere at the lights location for debugging purpose
+				if (showLightGeometry) {
+					//transformation for the geometry
+					glm::mat4 trans = sceneNode->m_data_object->calculateTransform();
+					//Node and Geometry for the Light position
+					std::shared_ptr<CVK::Node> light_node = std::make_shared<CVK::Node>("Light_Geometry_Node");
+					std::shared_ptr<CVK::Sphere> light_geometry = std::make_shared<CVK::Sphere>(light->m_position, 0.3f);//sphere at the lights position with radius 0.3
+					//set geometry and transform for node
+					light_node->setGeometry(light_geometry);
+					light_node->setModelMatrix(trans);
+					m_nodes.push_back(light_node);
+					//Node and Geometry for the Light direction
+					std::shared_ptr<CVK::Node> light_node_dir = std::make_shared<CVK::Node>("Light_Geometry_Node");
+					std::shared_ptr<CVK::Cone> light_geometry_dir = std::make_shared<CVK::Cone>(light->m_position, light->m_direction, 0.05f, 0.0f , 5);//cone for lights direction
+					 //set geometry and transform for node
+					light_node_dir->setGeometry(light_geometry_dir);
+					light_node_dir->setModelMatrix(trans);
+					m_nodes.push_back(light_node_dir);
+				}
 			}
 
-			//Return an empty vector of nodes.
-			return std::vector<std::shared_ptr<CVK::Node>>();
+			//Return an vector of nodes (With nodes for light geometry or empty when data object is a camera).
+			return m_nodes;
 		}
 
 		//////////////////////////////////////////////////////////////////////////////////////////
@@ -297,7 +317,7 @@ namespace CVK
 		for (std::shared_ptr<KIRK::SceneNode> child : sceneNode->m_children)
 		{
 			//First create all children.
-			std::vector<std::shared_ptr<CVK::Node>> child_nodes = toCVKNode(child);
+			std::vector<std::shared_ptr<CVK::Node>> child_nodes = toCVKNode(child, showLightGeometry);
 
 			if (child_nodes.empty())
 				continue;

@@ -12,6 +12,7 @@
 #include <CVK/CVK_2/CVK_FreeFlight.h>
 #include <CVK/CVK_2/CVK_Trackball.h>
 #include <CVK/CVK_2/CVK_Cone.h>
+#include <CVK/CVK_2/CVK_Sphere.h>
 #include "KIRK/Common/Ray.h"
 
 namespace CVK
@@ -49,10 +50,11 @@ namespace CVK
         /**
          Converts the SceneGraph. Available types are CVK_RT::Scene, CVK_RT::GPU_Scene and CVK::Node.
          @param The base KIRK::SceneGraph
+		 @param [Optional]showLightGeometry If set to true a sphere will be rendered at every Light position
          @returns The converted Scene.
          */
 
-        static std::shared_ptr<CVK::Node> exportScene(std::shared_ptr<KIRK::SceneGraph> sceneGraph);
+        static std::shared_ptr<CVK::Node> exportScene(std::shared_ptr<KIRK::SceneGraph> sceneGraph, bool showLightGeometry = false);
     private:
         /**
          Converts the KIRK::SceneNode recursively to a vector of CVK::Node pointers. That is needed, as KIRK::SceneNodes
@@ -61,7 +63,7 @@ namespace CVK
          @param abs_base_transform The current parent node transform.
          @return an std::vector<CVK::Node*> of nodes containing either nothing or a with exactly one Material each.
          */
-        static std::vector<std::shared_ptr<CVK::Node>> toCVKNode(const std::shared_ptr<KIRK::SceneNode> sceneNode);
+        static std::vector<std::shared_ptr<CVK::Node>> toCVKNode(const std::shared_ptr<KIRK::SceneNode> sceneNode, bool showLightGeometry);
     };
 }
 

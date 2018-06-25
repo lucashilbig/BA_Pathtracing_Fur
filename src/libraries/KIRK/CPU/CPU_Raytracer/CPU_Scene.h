@@ -147,6 +147,15 @@ private:
      */
     void computeBounds();
 
+	/**
+	Converts a fur fiber, which consists of cones, to KIRK::Triangles.
+	@param fiber The fur fiber struct from the Mesh which will be converted to triangles.
+	@param mesh_transform The current meshes transformation matrix.
+	@param resolution Determines the amount of triangles which will be build from the cone geometry of the fiber.
+	@return Vector of all Triangles that were build from the fur fiber.
+	*/
+	std::vector<Triangle *> fiberToTriangles(KIRK::Mesh::furFiber fiber, glm::mat4 mesh_transform, unsigned int resolution);
+
     glm::vec3 m_bound[2]; //!< Bounding limits of the whole scene.
     std::vector<Triangle *> m_scene_objects; //!< all triangles of the scene
     std::weak_ptr <KIRK::SceneGraph> m_sceneGraph; //!< Remember what scene you were created from. "Scene, I am your father!"

@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
 	//Loading arguments is just as easy as to have a key char and a default value for when the argument is not set.
 	//CAUTION: Cannot use any const here. So no const char* allowed.
 	//Not important to have optimized const char*'s here for appending RESOURCES_PATH, all this is kind of temporary.
-	std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SkinPatch/scene_lowLight.json"));
+	std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/scene.json"));
 	std::string relative_path = arg_map.get('s', std::string(""));
 	unsigned int image_width = arg_map.get('w', 1280);
 	unsigned int image_height = arg_map.get('h', 720);
@@ -216,6 +216,8 @@ int main(int argc, char *argv[])
 	//Load up scene.
 	std::shared_ptr<KIRK::SceneGraph> scene(KIRK::SceneGraph::makeSceneGraph(file));
 
+	
+
 	//Initializing environment map (cubeMap here)
 	scene->getEnvironment()->loadCubeMap(RESOURCES_PATH "/cubeMap/posx.jpg",
 		RESOURCES_PATH "/cubeMap/posy.jpg",
@@ -224,8 +226,11 @@ int main(int argc, char *argv[])
 		RESOURCES_PATH "/cubeMap/negy.jpg",
 		RESOURCES_PATH "/cubeMap/negz.jpg");
 
+	//save scene to json file
+	//jsonio::writeScene(scene, std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/")));
+
 	//Apply fur on every triangle in the scene. For testing purpose.
-	scene->addFurFibersToAllMeshes(15, 0.004f);
+	scene->addFurFibersToAllMeshes(10, 0.004f);//0.004f
 
 	//////////////////////////////////////////////
 	//
@@ -246,7 +251,7 @@ int main(int argc, char *argv[])
 
 	//We use the screenFillShader to draw our texture to a screen filling quad.
 	auto screen_shader = CVK::ShaderUtils::ScreenFillShader();
-	auto phong_shader = std::make_shared<CVK::ShaderUtils::PhongToScreenShader>(CVK::SceneToCVK::exportScene(scene));
+	auto phong_shader = std::make_shared<CVK::ShaderUtils::PhongToScreenShader>(CVK::SceneToCVK::exportScene(scene, true));
 
 	//////////////////////////////////////////////
 	//
@@ -333,6 +338,7 @@ int main(int argc, char *argv[])
 			if (ImGui::Button("Render Image", ImVec2(250.0f, 32.0f)))
 			{
 				LOG_INFO("\n       Rendering new Image \n       -------------------");
+				cpu_pathtracer->reset();
 				m_is_raytracer_active = true;
 			}
 			if (pop_color) { ImGui::PopStyleColor(3); pop_color = false; }
