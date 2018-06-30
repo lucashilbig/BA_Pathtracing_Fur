@@ -8,9 +8,9 @@
 #include "KIRK/Utils/Threading.h"
 #include "KIRK/Utils/Math.h"
 #include "BsdfFactory.h"
+#include "KIRK/Common/Intersection.h"
 
 namespace KIRK {
-class Intersection;
 
 class BSDFHelper
 {
@@ -185,5 +185,4 @@ public:
 const BsdfRegistrator <TransparentBSDF> transparentBSDFRegistrator("TransparentBSDF");
 
 }
-
 #endif

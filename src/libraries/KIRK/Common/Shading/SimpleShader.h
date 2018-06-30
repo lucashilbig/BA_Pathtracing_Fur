@@ -36,7 +36,7 @@ inline void SimpleShader::shade(KIRK::CPU::PathTracer& pathtracer, const KIRK::I
 	Color::RGBA ambientLight;
 
 	glm::vec3 counter_ray = -normalize(resultRay.m_direction);
-	Material* material = hit.m_triangle->getMaterial();
+	Material* material = hit.m_object->getMaterial();
 	std::shared_ptr<BSDF> bsdf = material->m_bsdf;
 	glm::vec2 sample = pathtracer.getSampler().sample2D();
 
@@ -122,7 +122,7 @@ inline KIRK::Color::RGBA SimpleShader::calcDirectLight(KIRK::CPU::PathTracer& pa
 	if(light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
 	{
 		lightColor *= attenuation
-				* glm::vec4(hit.m_triangle->getMaterial()->m_bsdf->evaluateLight(hit, hitToLight.m_direction, -hit.m_ray.m_direction), 1.0f)
+				* glm::vec4(hit.m_object->getMaterial()->m_bsdf->evaluateLight(hit, hitToLight.m_direction, -hit.m_ray.m_direction), 1.0f)
 				* std::abs(glm::dot(hitToLight.m_direction, hit.m_normal));
 
 		if(light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)

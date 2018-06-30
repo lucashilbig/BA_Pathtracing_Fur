@@ -6,6 +6,7 @@
 
 #include "KIRK/Utils/Log.h"
 #include "KIRK/Common/Ray.h"
+#include "KIRK/Common/Object.h"
 #include "KIRK/Common/Intersection.h"
 
 namespace KIRK {

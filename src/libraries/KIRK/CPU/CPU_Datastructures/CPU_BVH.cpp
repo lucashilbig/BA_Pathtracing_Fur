@@ -65,7 +65,7 @@ bool CPU::BVH::closestIntersection(KIRK::Intersection *hit)
 
     m_root.traverse(hit, inv_dir, dir_sign, tmin, tmax);
 
-    return (hit->m_triangle != 0);
+    return (hit->m_object != 0);
 }
 
 /*

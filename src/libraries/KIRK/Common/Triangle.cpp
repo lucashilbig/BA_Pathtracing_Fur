@@ -302,11 +302,6 @@ bool KIRK::Triangle::planeBoxOverlap(const glm::vec3 &n, const glm::vec3 &v0, co
     return false;
 }
 
-glm::vec3 *KIRK::Triangle::getBounds()
-{
-    return m_bound;
-}
-
 bool KIRK::Triangle::isInAABB(glm::vec3 *bbox)
 {
     glm::vec3 diff = (bbox[1] - bbox[0]);

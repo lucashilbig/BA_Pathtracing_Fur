@@ -117,13 +117,13 @@ glm::vec3 LambertianReflectionBSDF::localSample (const Intersection& hit, const 
 	mat_flags = 0;
 	if(output_pdf == 0.f) { return glm::vec3(0.f); }
 
-	return glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>();
+	return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>();
 }
 
 glm::vec3 LambertianReflectionBSDF::evaluateLight (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray)
 {
 	bool reflect = glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0;
-	if(reflect) { return glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>(); }
+	if(reflect) { return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>(); }
 	return glm::vec3(0);
 }
 
@@ -139,7 +139,7 @@ glm::vec3 SpecularReflectionBSDF::localSample (const Intersection& hit, const gl
 	output_pdf = 1.f;
 	mat_flags |= BSDFHelper::MATFLAG_SPECULAR_BOUNCE;
 
-	return glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
+	return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
 }
 
 glm::vec3 SpecularReflectionBSDF::evaluateLight (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) { return glm::vec3(.0f); }
@@ -152,7 +152,7 @@ glm::vec3 SpecularReflectionBSDF::evaluateLight (const Intersection& hit, const 
 
 glm::vec3 GlossyBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 {
-	float rad = glm::radians(180.0f - (1.0f - hit.m_triangle->getMaterial()->fetchParameterFloat <MatParamType::ROUGHNESS>(hit.m_texcoord)) * 180.0f);
+	float rad = glm::radians(180.0f - (1.0f - hit.m_object->getMaterial()->fetchParameterFloat <MatParamType::ROUGHNESS>(hit.m_texcoord)) * 180.0f);
 	glm::vec3 reflected = reflect(-local_input_ray, faceforward(normal, -local_input_ray, normal));
 	glm::vec3 sampledPoint = BSDFHelper::sampleAngle(sample, rad);
 
@@ -167,7 +167,7 @@ glm::vec3 GlossyBSDF::localSample(const Intersection& hit, const glm::vec3& loca
 
 	mat_flags |= BSDFHelper::MATFLAG_SPECULAR_BOUNCE;
 
-	return glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
+	return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
 }
 
 glm::vec3 GlossyBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray)
@@ -184,7 +184,7 @@ glm::vec3 GlossyBSDF::evaluateLight(const Intersection& hit, const glm::vec3& lo
 glm::vec3 SpecularTransmissionBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 {
 
-	Material* material = hit.m_triangle->getMaterial();
+	Material* material = hit.m_object->getMaterial();
 
 	//Needed parameters for refraction and reflection
 	bool entering = glm::dot(local_input_ray, normal) > 0.f;
@@ -204,7 +204,7 @@ glm::vec3 SpecularTransmissionBSDF::localSample(const Intersection& hit, const g
 	{
 		mat_flags |= BSDFHelper::MATFLAG_TRANSPARENT_BOUNCE;
 
-		glm::vec3 ft = glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * (glm::vec3(1, 1, 1) - fresnel);
+		glm::vec3 ft = glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * (glm::vec3(1, 1, 1) - fresnel);
 
 		if (useRadianceOverImportance) { ft *= (eta_i * eta_i) / (eta_t * eta_t); }
 
@@ -230,7 +230,7 @@ glm::vec3 LambertianTransmissionBSDF::localSample (const Intersection& hit, cons
 
 	if(output_pdf == 0.f) { return glm::vec3(0.f); }
 
-	return glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * glm::one_over_pi <float>();
+	return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * glm::one_over_pi <float>();
 }
 
 glm::vec3 LambertianTransmissionBSDF::evaluateLight (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray)
@@ -238,7 +238,7 @@ glm::vec3 LambertianTransmissionBSDF::evaluateLight (const Intersection& hit, co
 	bool reflect = glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0;
 
 	if(!reflect)
-		return glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>();
+		return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>();
 
 	return glm::vec3(0);
 }
@@ -252,7 +252,7 @@ glm::vec3 LambertianTransmissionBSDF::evaluateLight (const Intersection& hit, co
 glm::vec3 GlassBSDF::localSample (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 {
 
-	Material* material = hit.m_triangle->getMaterial();
+	Material* material = hit.m_object->getMaterial();
 
 	//Needed parameters for refraction and reflection
 	bool entering = glm::dot(local_input_ray, normal) > 0.f;
@@ -271,7 +271,7 @@ glm::vec3 GlassBSDF::localSample (const Intersection& hit, const glm::vec3& loca
 		mat_flags |= BSDFHelper::MATFLAG_TRANSPARENT_BOUNCE;
 
 		output_pdf = 1 - fresnel;
-		glm::vec3 ft = glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * (glm::vec3(1, 1, 1) - fresnel);
+		glm::vec3 ft = glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * (glm::vec3(1, 1, 1) - fresnel);
 
 		if(useRadianceOverImportance) { ft *= (eta_i * eta_i) / (eta_t * eta_t); }
 
@@ -279,7 +279,7 @@ glm::vec3 GlassBSDF::localSample (const Intersection& hit, const glm::vec3& loca
 	}
 	local_output_ray = glm::reflect(glm::normalize(-local_input_ray), glm::faceforward(normal, -glm::normalize(local_input_ray), normal));
 	output_pdf = fresnel;
-	return fresnel * glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
+	return fresnel * glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
 }
 
 glm::vec3 GlassBSDF::evaluateLight (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) { return glm::vec3(0); }
@@ -293,7 +293,7 @@ glm::vec3 GlassBSDF::evaluateLight (const Intersection& hit, const glm::vec3& lo
 glm::vec3 MilkGlassBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 {
 
-	Material* material = hit.m_triangle->getMaterial();
+	Material* material = hit.m_object->getMaterial();
 
 	//Needed parameters for refraction and reflection
 	bool entering = glm::dot(local_input_ray, normal) > 0.f;
@@ -309,7 +309,7 @@ glm::vec3 MilkGlassBSDF::localSample(const Intersection& hit, const glm::vec3& l
 	// Choose whether to sample refractive or reflective BSDF
 	if (refracted != glm::vec3(0) && sample.y > fresnel && !std::isnan(refracted.x))
 	{
-		float rad = glm::radians(180.0f - (1.0f - hit.m_triangle->getMaterial()->fetchParameterFloat <MatParamType::ROUGHNESS>(hit.m_texcoord)) * 180.0f);
+		float rad = glm::radians(180.0f - (1.0f - hit.m_object->getMaterial()->fetchParameterFloat <MatParamType::ROUGHNESS>(hit.m_texcoord)) * 180.0f);
 		glm::vec3 sampledPoint = BSDFHelper::sampleAngle(sample, rad);
 
 		local_output_ray = Math::localToWorldNormal(sampledPoint, refracted);
@@ -321,13 +321,13 @@ glm::vec3 MilkGlassBSDF::localSample(const Intersection& hit, const glm::vec3& l
 		mat_flags |= BSDFHelper::MATFLAG_TRANSPARENT_BOUNCE;
 
 		output_pdf = 1 - fresnel;
-		glm::vec3 ft = glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * (glm::vec3(1, 1, 1) - fresnel);
+		glm::vec3 ft = glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::VOLUME>(hit.m_texcoord)) * (glm::vec3(1, 1, 1) - fresnel);
 
 		if (useRadianceOverImportance) { ft *= (eta_i * eta_i) / (eta_t * eta_t); }
 
 		return ft / glm::abs(glm::dot(local_output_ray, normal));
 	}
-	float rad = glm::radians(180.0f - (1.0f - hit.m_triangle->getMaterial()->fetchParameterFloat <MatParamType::ROUGHNESS>(hit.m_texcoord)) * 180.0f);
+	float rad = glm::radians(180.0f - (1.0f - hit.m_object->getMaterial()->fetchParameterFloat <MatParamType::ROUGHNESS>(hit.m_texcoord)) * 180.0f);
 	glm::vec3 reflected = reflect(-local_input_ray, faceforward(normal, -local_input_ray, normal));
 	glm::vec3 sampledPoint = BSDFHelper::sampleAngle(sample, rad);
 
@@ -338,7 +338,7 @@ glm::vec3 MilkGlassBSDF::localSample(const Intersection& hit, const glm::vec3& l
 		local_output_ray = Math::localToWorldNormal(sampledPoint * glm::vec3(-1, -1, 1), reflected);
 	}
 	output_pdf = fresnel;
-	return fresnel * glm::vec3(hit.m_triangle->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
+	return fresnel * glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
 }
 
 glm::vec3 MilkGlassBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) { return glm::vec3(0); }
@@ -370,7 +370,7 @@ glm::vec3 EmissionBSDF::evaluateLight (const Intersection& hit, const glm::vec3&
 
 glm::vec3 TransparentBSDF::localSample (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 {
-	Material* mat = hit.m_triangle->getMaterial();
+	Material* mat = hit.m_object->getMaterial();
 	glm::vec2 texcoord = hit.m_texcoord;
 	local_output_ray = -local_input_ray;
 	mat_flags = BSDFHelper::MATFLAG_TRANSPARENT_BOUNCE;

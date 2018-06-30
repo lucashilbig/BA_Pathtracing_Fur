@@ -154,7 +154,7 @@ void PathTracer::traceRays ()
 						else
 						{
 							//We actually found an regular intersection, shade it.
-							m_hitBuffer[segmentIndex].m_triangle->getMaterial()->m_shader->shade(*this, m_hitBuffer[segmentIndex], m_bounceBuffer[segmentIndex], m_rayBuffer[segmentIndex]);
+							m_hitBuffer[segmentIndex].m_object->getMaterial()->m_shader->shade(*this, m_hitBuffer[segmentIndex], m_bounceBuffer[segmentIndex], m_rayBuffer[segmentIndex]);
 							if ((m_bounceBuffer[segmentIndex].mat_flags & BSDFHelper::MATFLAG_EMISSIVE_BOUNCE) == BSDFHelper::MATFLAG_EMISSIVE_BOUNCE)
 							{
 								m_hitBuffer[segmentIndex].m_lambda = -1;
@@ -173,13 +173,13 @@ void PathTracer::traceRay (int segmentIndex, bool is_primary, int mat_flags)
 	if(m_hitBuffer[segmentIndex].m_lambda == -1) { return; }
 	m_hitBuffer[segmentIndex].m_ray = m_rayBuffer[segmentIndex];
 	m_hitBuffer[segmentIndex].m_lambda = FLT_MAX;
-	m_hitBuffer[segmentIndex].m_triangle = nullptr;
+	m_hitBuffer[segmentIndex].m_object = nullptr;
 	bool is_intersection = m_cpuscene->getDataStructure().closestIntersection(&m_hitBuffer[segmentIndex]);
 
 	if(is_intersection)
 	{
-		m_hitBuffer[segmentIndex].m_triangle->calcNormal(&m_hitBuffer[segmentIndex]);
-		m_hitBuffer[segmentIndex].m_triangle->calcTcoord(&m_hitBuffer[segmentIndex]);
+		m_hitBuffer[segmentIndex].m_object->calcNormal(&m_hitBuffer[segmentIndex]);
+		m_hitBuffer[segmentIndex].m_object->calcTcoord(&m_hitBuffer[segmentIndex]);
 	}
 	bool is_light_intersection = false;
 	float t_lights = FLT_MAX;
