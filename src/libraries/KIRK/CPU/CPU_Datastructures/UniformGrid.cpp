@@ -45,7 +45,7 @@ int KIRK::CPU::UniformGrid::getSizeInBytes()
 {
     int result = sizeof(*this);
     result += m_voxelCandidates.size() * sizeof(std::vector<KIRK::Triangle *>);
-    for(std::vector<KIRK::Triangle *> v : m_voxelCandidates)
+    for(std::vector<KIRK::Object *> v : m_voxelCandidates)
         result += v.size() * sizeof(KIRK::Triangle *);
     return result;
 }
@@ -56,18 +56,18 @@ void KIRK::CPU::UniformGrid::init()
     m_totalVoxels = m_numVoxels.x * m_numVoxels.y * m_numVoxels.z;
     m_maxIndex = m_numVoxels - glm::ivec3(1, 1, 1);
 
-    m_voxelCandidates = std::vector<std::vector<KIRK::Triangle *>>(m_totalVoxels);
+    m_voxelCandidates = std::vector<std::vector<KIRK::Object *>>(m_totalVoxels);
 }
 
 
 void KIRK::CPU::UniformGrid::addBaseDataStructure(KIRK::CPU::Scene *scene)
 {
-    const std::vector<KIRK::Triangle *> obj_list = scene->getSceneObjects();
+    const std::vector<KIRK::Object *> obj_list = scene->getSceneObjects();
     setBounds(scene->getBounds());
 
     for(unsigned int index = 0; index < obj_list.size(); index++)
     {
-		KIRK::Triangle *obj = obj_list[index];
+		KIRK::Object *obj = obj_list[index];
         glm::vec3 *obj_bbox = obj->getBounds();
         glm::vec3 voxel_bbox[2];
         glm::vec3 minIndex = (obj_bbox[0] - m_minBound) * m_invVoxelSize;
@@ -131,7 +131,7 @@ bool KIRK::CPU::UniformGrid::closestIntersection(KIRK::Intersection *hit)
         tnext.z = (1.f - posVec.z + index.z) * delta.z;
 
     float tMin = 0.f;
-    std::vector<KIRK::Triangle *> *candidates;
+    std::vector<KIRK::Object *> *candidates;
 
     for(;;)
     {
@@ -185,7 +185,7 @@ bool KIRK::CPU::UniformGrid::isIntersection(KIRK::Ray *ray, float tMax)
     else
         tnext.z = (1.f - posVec.z + index.z) * delta.z;
 
-    std::vector<KIRK::Triangle *> *candidates;
+    std::vector<KIRK::Object *> *candidates;
 
     for(;;)
     {

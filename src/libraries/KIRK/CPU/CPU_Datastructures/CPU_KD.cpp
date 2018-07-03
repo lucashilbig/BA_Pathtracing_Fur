@@ -44,7 +44,7 @@ void CPU::KDTree::printAdditionalDebugInfo() const
  */
 void CPU::KDTree::addBaseDataStructure(CPU::Scene *scene)
 {
-    std::vector<KIRK::Triangle *> objects = scene->getSceneObjects();
+    std::vector<KIRK::Object *> objects = scene->getSceneObjects();
     m_bvol = BoundingVolume((scene->getBounds())[0], (scene->getBounds())[1]);
     m_minBound = m_bvol.min();
     m_maxBound = m_bvol.max();
@@ -141,7 +141,7 @@ CPU::KDNode::KDNode() :
  *
  * This uses binned splitting: We set a final amount of bins and sort objects into them, using bin bounds as splitting planes.
  */
-void CPU::KDNode::split(std::vector<KIRK::Triangle *> &objects, const BoundingBox &box, TreeAccelProperties &p, int depth)
+void CPU::KDNode::split(std::vector<KIRK::Object *> &objects, const BoundingBox &box, TreeAccelProperties &p, int depth)
 {
     ++(p.amnt_nodes);
 
@@ -149,7 +149,7 @@ void CPU::KDNode::split(std::vector<KIRK::Triangle *> &objects, const BoundingBo
     if(depth < p.max_depth && objects.size() > p.leaf_threshold)
     {
         BoundingBox left_box, right_box; // to be filled
-        std::vector<KIRK::Triangle *> left_range, right_range; // to be filled
+        std::vector<KIRK::Object *> left_range, right_range; // to be filled
 
         // Compute splitting plane and decide which objects should be on either side of it
         // This will set m_axis and m_split_pos
@@ -189,7 +189,7 @@ void CPU::KDNode::split(std::vector<KIRK::Triangle *> &objects, const BoundingBo
  * Any documentation in the function body assumes that you are familiar with the Surface Area Heuristic and what is needed to compute the SAH cost for a given split plane candidate.
  */
 void
-CPU::KDNode::split(const std::vector<KIRK::Triangle *> &objects, std::vector<Plane> ( &planes )[3], const BoundingBox &box,
+CPU::KDNode::split(const std::vector<KIRK::Object *> &objects, std::vector<Plane> ( &planes )[3], const BoundingBox &box,
               TreeAccelProperties &p, int depth)
 {
     ++(p.amnt_nodes);
@@ -485,7 +485,7 @@ bool CPU::KDNode::traverse(KIRK::Ray *ray, const glm::vec3 &inv_dir, float tmin,
  * @param p KD-Tree properties such as depth or amount of nodes
  * @param depth current recursion depth
  */
-void CPU::KDNode::createLeaf(std::vector<KIRK::Triangle *> &objects, TreeAccelProperties &p, int depth)
+void CPU::KDNode::createLeaf(std::vector<KIRK::Object *> &objects, TreeAccelProperties &p, int depth)
 {
     ++(p.amnt_leaves);
 
@@ -510,7 +510,7 @@ void CPU::KDNode::createLeaf(std::vector<KIRK::Triangle *> &objects, TreeAccelPr
  *
  * Alternative used for exact SAH-splitting.
  */
-void CPU::KDNode::createLeaf(const std::vector<KIRK::Triangle *> &objects, const std::vector<Plane> ( &planes )[3],
+void CPU::KDNode::createLeaf(const std::vector<KIRK::Object *> &objects, const std::vector<Plane> ( &planes )[3],
                         TreeAccelProperties &p, int depth)
 {
     ++(p.amnt_leaves);
@@ -544,8 +544,8 @@ void CPU::KDNode::createLeaf(const std::vector<KIRK::Triangle *> &objects, const
  *
  * Any documentation in the function body assumes that you are familiar with the Surface Area Heuristic and what is needed to compute the SAH cost for a given split plane candidate.
  */
-void CPU::KDNode::partition(std::vector<KIRK::Triangle *> &left_range, std::vector<KIRK::Triangle *> &right_range,
-                       std::vector<KIRK::Triangle *> &objects, const BoundingBox &box, BoundingBox &left_box,
+void CPU::KDNode::partition(std::vector<KIRK::Object *> &left_range, std::vector<KIRK::Object *> &right_range,
+                       std::vector<KIRK::Object *> &objects, const BoundingBox &box, BoundingBox &left_box,
                        BoundingBox &right_box)
 {
     /////////////////////////////////////////

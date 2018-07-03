@@ -16,7 +16,7 @@ const char *CPU::BVH::printName() const
     void CPU::BVH::addBaseDataStructure(KIRK::CPU::Scene *scene)
 {
 	Clock<> clock;
-    const std::vector<KIRK::Triangle *> objects = scene->getSceneObjects();
+    const std::vector<KIRK::Object *> objects = scene->getSceneObjects();
 
     // Instead of copying object pointers, refer to objects with their index in the original pointer array.
     // The ID of an object is its index in the object array
@@ -92,7 +92,7 @@ bool CPU::BVH::isIntersection(KIRK::Ray *ray, float tMax)
     return m_root.traverse(ray, inv_dir, dir_sign, tmin, tmax, tMax);
 }
 
-void CPU::BVHNode::split(const CPU::IdRange &range, const std::vector<KIRK::Triangle *> &objects,
+void CPU::BVHNode::split(const CPU::IdRange &range, const std::vector<KIRK::Object *> &objects,
                     std::vector<unsigned int> &object_ids, const CPU::BoundingBox &centbox, TreeAccelProperties &p,
                     int depth)
 {
@@ -265,7 +265,7 @@ bool CPU::BVHNode::traverse(KIRK::Ray *ray, const glm::vec3 &inv_dir, int dir_si
 }
 
 void CPU::BVHNode::partition(const IdRange &id_range, IdRange &left_range, IdRange &right_range,
-                        std::vector<unsigned int> &object_ids, const std::vector<KIRK::Triangle *> &objects,
+                        std::vector<unsigned int> &object_ids, const std::vector<KIRK::Object *> &objects,
                         const BoundingBox &centbox, BoundingBox &left_centbox, BoundingBox &right_centbox)
 {
 /*

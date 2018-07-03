@@ -25,7 +25,7 @@ public:
 
     inline bool hasCandidates() const { return m_hasCandidates; }
 
-    inline void addCandidate(KIRK::Triangle *o)
+    inline void addCandidate(KIRK::Object *o)
     {
         if(m_candidateList.empty())
             m_candidateList.push_back(o);
@@ -34,10 +34,10 @@ public:
         m_hasCandidates = true;
     }
 
-    inline std::vector<KIRK::Triangle *> *getCandidates() { return &m_candidateList; }
+    inline std::vector<KIRK::Object *> *getCandidates() { return &m_candidateList; }
 
 protected:
-    std::vector<KIRK::Triangle *> m_candidateList;
+    std::vector<KIRK::Object *> m_candidateList;
     bool m_hasCandidates;
 
 };

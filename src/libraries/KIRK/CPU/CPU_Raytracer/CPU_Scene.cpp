@@ -94,7 +94,11 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 				m_scene_objects.push_back(tri);
 			}
 
-			//If we have fur fibers in our mesh, we convert them to triangles
+			//////
+			// FIBER TO TRIANGLE (old variant)
+			//////
+
+			/*//If we have fur fibers in our mesh, we convert them to triangles
 			if (!mesh->m_furFibers.empty())
 			{
 				//Iterate over every fur fiber
@@ -106,6 +110,49 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 					for (int t = 0; t < triangles.size(); t++)
 					{
 						m_scene_objects.push_back(triangles[t]);
+					}
+				}
+			}*/
+			
+
+			//////
+			// FIBER TO CYLINDER
+			//////
+
+			//If we have fur fibers in our mesh, we convert them to Cylinders
+			if (!mesh->m_furFibers.empty())
+			{
+				//transformation of fur fiber
+				glm::mat4 transform = base_transform * child->m_transform;
+				//Material for fur fibers
+				std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat");
+				mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color
+				mat->m_transparency.value = 0.4f;
+				mat->m_reflectivity.value = 0.4f;
+				m_materials.push_back(mat);
+
+				//Iterate over every fur fiber
+				for (int i = 0; i < mesh->m_furFibers.size(); i++)
+				{
+					KIRK::Mesh::furFiber *fiber = &mesh->m_furFibers[i];
+					//Iterate over every cone in the fur fiber
+					for (int c = 0; c < fiber->fiber_positions.size() - 1; c++)
+					{
+						//get base and apex position for cylinder
+						glm::vec3 basepos = fiber->fiber_positions[c];
+						glm::vec3 apexpos = fiber->fiber_positions[c + 1];
+						float baseradius = fiber->fiber_radius[c];
+						//move base position a bit to hide cone edges in the fiber struct
+						basepos -= 0.008f * (apexpos - basepos);
+						//lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
+						baseradius -= (c > 3) ? 0.1f * baseradius : 0.05f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
+						//create raytracing cylinder object
+						KIRK::Cylinder *obj = new KIRK::Cylinder(basepos, apexpos,
+							baseradius, fiber->fiber_radius[c+1], &transform);
+						//set cylinder material
+						obj->setMaterial(mat.get());
+						//add object to scene
+						m_scene_objects.push_back(obj);
 					}
 				}
 			}
@@ -148,7 +195,7 @@ void KIRK::CPU::Scene::buildDatastructure()
 	if (m_datastructure) m_datastructure->addBaseDataStructure(this);
 }
 
-const std::vector<KIRK::Triangle *> &KIRK::CPU::Scene::getSceneObjects() const
+const std::vector<KIRK::Object *> &KIRK::CPU::Scene::getSceneObjects() const
 {
 	return m_scene_objects;
 }

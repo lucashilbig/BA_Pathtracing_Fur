@@ -35,9 +35,9 @@ public:
     };
 
 protected:
-    bool testClosestIntersectionWithCandidates(std::vector<KIRK::Triangle *> *candidates, KIRK::Intersection *hit, float tMin = 0.0f,
+    bool testClosestIntersectionWithCandidates(std::vector<KIRK::Object *> *candidates, KIRK::Intersection *hit, float tMin = 0.0f,
                                                float tMax = FLT_MAX);
-    bool testIsIntersectionWithCandidates(std::vector<KIRK::Triangle *> *candidates, KIRK::Ray *ray, float tMax = FLT_MAX);
+    bool testIsIntersectionWithCandidates(std::vector<KIRK::Object *> *candidates, KIRK::Ray *ray, float tMax = FLT_MAX);
 
 };
 }}

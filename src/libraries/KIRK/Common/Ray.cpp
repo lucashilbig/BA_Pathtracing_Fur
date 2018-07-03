@@ -11,13 +11,13 @@ namespace KIRK {
 	Ray::Ray(const glm::vec3 origin, const glm::vec3 dir)
 	{
 		m_origin = origin;
-		m_direction = dir;
+		m_direction = glm::normalize(dir);
 	}
 
 	Ray::Ray(glm::vec3 &&origin, glm::vec3 &&dir)
 	{
 		m_origin = origin;
-		m_direction = dir;
+		m_direction = glm::normalize(dir);
 	}
 
 	glm::vec3 Ray::followDistance(const float distance) const

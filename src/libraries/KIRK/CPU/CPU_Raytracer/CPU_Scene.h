@@ -100,7 +100,7 @@ public:
      * Getter for all the objects stored in the scene
      * @return A const reference to this Scene's Objects vector. It chall not be changed outside!
      */
-    const std::vector<Triangle *> &getSceneObjects() const;
+    const std::vector<Object *> &getSceneObjects() const;
 
     /**
      * Get the boundig box of the scene
@@ -157,7 +157,7 @@ private:
 	std::vector<Triangle *> fiberToTriangles(KIRK::Mesh::furFiber fiber, glm::mat4 mesh_transform, unsigned int resolution);
 
     glm::vec3 m_bound[2]; //!< Bounding limits of the whole scene.
-    std::vector<Triangle *> m_scene_objects; //!< all triangles of the scene
+    std::vector<Object *> m_scene_objects; //!< all Objects of the scene
     std::weak_ptr <KIRK::SceneGraph> m_sceneGraph; //!< Remember what scene you were created from. "Scene, I am your father!"
     std::unique_ptr <KIRK::CPU::CPU_DataStructure> m_datastructure; //!< The datastructure to be created from this scene.
 

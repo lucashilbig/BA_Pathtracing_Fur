@@ -51,7 +51,7 @@ int KIRK::CPU::Octree::getSizeInBytes()
 
 void KIRK::CPU::Octree::addBaseDataStructure(KIRK::CPU::Scene *scene)
 {
-    for(KIRK::Triangle *obj : scene->getSceneObjects())
+    for(KIRK::Object *obj : scene->getSceneObjects())
         addObject(obj);
 }
 
@@ -74,7 +74,7 @@ void KIRK::CPU::Octree::subdivide()
     addChild(new Octree(nextDepth, (m_mid + glm::vec3(offset.x, offset.y, offset.z))));
 }
 
-void KIRK::CPU::Octree::addObject(KIRK::Triangle *obj)
+void KIRK::CPU::Octree::addObject(KIRK::Object *obj)
 {
     glm::vec3 bounds[2] = {m_minBound, m_maxBound};
     if(!(obj->isInAABB(bounds)))

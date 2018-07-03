@@ -129,7 +129,7 @@ public:
 	*
 	* This bounding volume has eight vertices marking its boundaries. We only need to store two vertices (min and max ones) in order to be able to compute all the others.
 	*/
-    void computeBoundaries(const std::vector<KIRK::Triangle *> &objects, const std::vector<unsigned int> &object_ids,
+    void computeBoundaries(const std::vector<KIRK::Object *> &objects, const std::vector<unsigned int> &object_ids,
                            const IdRange &id_range);
 
 	/*

@@ -42,7 +42,7 @@ private:
     glm::ivec3 m_numVoxels, m_maxIndex;
     unsigned int m_totalVoxels;
 
-    std::vector<std::vector<KIRK::Triangle *>> m_voxelCandidates;
+    std::vector<std::vector<KIRK::Object *>> m_voxelCandidates;
 };
 
 }}

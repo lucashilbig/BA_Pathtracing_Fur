@@ -14,7 +14,7 @@ bool KIRK::CPU::Container::closestIntersectionWithCandidates(KIRK::Intersection 
 {
     bool intersectionFoundInLeaf = false;
 
-    for(KIRK::Triangle *candidate : m_candidateList)
+    for(KIRK::Object *candidate : m_candidateList)
         if(candidate->closestIntersection(hit, tMin, tMax))
         {
             tMax = hit->m_lambda;
@@ -26,7 +26,7 @@ bool KIRK::CPU::Container::closestIntersectionWithCandidates(KIRK::Intersection 
 
 bool KIRK::CPU::Container::isIntersectionWithCandidates(KIRK::Ray *ray, float tMax)
 {
-    for(KIRK::Triangle *candidate : m_candidateList)
+    for(KIRK::Object *candidate : m_candidateList)
         if(candidate->isIntersection(ray, tMax))
             return true;
 

@@ -271,7 +271,6 @@ int main(int argc, char *argv[])
 	//set default raytracer
 	m_active_cpu_raytracer = cpu_pathtracer;
 
-
 	//////////////////////////////////////////////
 	//
 	//  GUI initialization

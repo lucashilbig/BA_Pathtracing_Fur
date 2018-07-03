@@ -20,7 +20,7 @@ void KIRK::CPU::NoDataStructure::addBaseDataStructure(Scene *scene)
         m_maxBound = scene->getBounds()[1];
     }
 
-    for(KIRK::Triangle *o : scene->getSceneObjects())
+    for(KIRK::Object *o : scene->getSceneObjects())
         addCandidate(o);
 }
 

@@ -5,12 +5,12 @@
 #include "CPU_DataStructure.h"
 
 
-bool KIRK::CPU::CPU_DataStructure::testClosestIntersectionWithCandidates(std::vector<KIRK::Triangle *> *candidates,
+bool KIRK::CPU::CPU_DataStructure::testClosestIntersectionWithCandidates(std::vector<KIRK::Object *> *candidates,
                                                                       KIRK::Intersection *hit, float tMin, float tMax)
 {
     bool intersectionFoundInLeaf = false;
 
-    for(KIRK::Triangle *candidate : *candidates)
+    for(KIRK::Object *candidate : *candidates)
         if(candidate->closestIntersection(hit, tMin, tMax))
         {
             tMax = hit->m_lambda;
@@ -20,10 +20,10 @@ bool KIRK::CPU::CPU_DataStructure::testClosestIntersectionWithCandidates(std::ve
     return intersectionFoundInLeaf;
 }
 
-bool KIRK::CPU::CPU_DataStructure::testIsIntersectionWithCandidates(std::vector < KIRK::Triangle * > *candidates, KIRK::Ray *ray,
+bool KIRK::CPU::CPU_DataStructure::testIsIntersectionWithCandidates(std::vector < KIRK::Object * > *candidates, KIRK::Ray *ray,
                                                                  float tMax)
 {
-    for(KIRK::Triangle *candidate : *candidates)
+    for(KIRK::Object *candidate : *candidates)
         if(candidate->isIntersection(ray, tMax))
             return true;
 

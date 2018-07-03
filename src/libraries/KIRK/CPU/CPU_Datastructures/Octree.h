@@ -25,7 +25,7 @@ public:
 private:
     Octree(int depth, glm::vec3 mid);
     void subdivide();
-    void addObject(KIRK::Triangle *obj);
+    void addObject(KIRK::Object *obj);
 
     bool traverseNode(glm::vec3 *tmin, glm::vec3 *tmax, unsigned char directionBits, KIRK::Intersection *hit);
     bool traverseNode(glm::vec3 *tmin, glm::vec3 *tmax, unsigned char directionBits, float tMax, KIRK::Ray *ray);

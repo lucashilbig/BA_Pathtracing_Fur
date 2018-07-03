@@ -10,17 +10,23 @@ KIRK::Cylinder::Cylinder(glm::vec3 basePoint, glm::vec3 apexPoint, float baseRad
 	m_apexpoint = glm::vec3(*modelMatrix * glm::vec4(apexPoint, 1.f));
 	m_baseradius = baseRadius;
 	m_apexradius = apexRadius;
-	m_height = glm::length(m_apexpoint - m_basepoint);
 
-	//calculated axis of the objects local space
-	m_v = glm::normalize(M_ti * (m_apexpoint - m_basepoint));//v-axis(vector at the center of the cylinder)
-	/* find two axes which are at right angles to cones v-axis(local z-axis) */
+	//pre-calculated axis of the objects local space
+	m_v = apexPoint - basePoint;//v-axis(vector at the center of the cylinder)
+	m_height = glm::length(m_v);
+	m_v = glm::normalize(m_v);
+
+	/* find two axes which are at right angles to cone_v */
 	glm::vec3 tmp(0.f, 1.f, 0.f);
 	if (1.f - fabs(glm::dot(tmp, m_v)) < KIRK::cRayEpsilon)
 		tmp = glm::vec3(0.f, 0.f, 1.f);
 
-	m_u = glm::normalize(glm::cross(m_v, tmp));//u-axis
-	m_w = glm::normalize(glm::cross(m_u, m_v));//w-axis
+	m_u = glm::normalize(glm::cross(m_v, tmp));
+	m_w = glm::normalize(glm::cross(m_u, m_v));
+	//multiply with transposed inverse of modelmatrix for final local axis
+	m_u = glm::normalize(M_ti * m_u);
+	m_v = glm::normalize(M_ti * m_v);
+	m_w = glm::normalize(M_ti * m_w);
 
 	//calculate slope and cylinders bottom and top parameters
 	m_slope = (m_baseradius - m_apexradius) / m_height;
@@ -70,12 +76,13 @@ bool KIRK::Cylinder::closestIntersection(Intersection *hit, float tMin, float tM
 	float a, b, c, d;
 	int nroots;
 	bool enter;
+	Ray *ray = &hit->m_ray;
 	glm::vec3 Q;
 
 	// Transformation of ray in local coordinate system
 
-	glm::vec3 P = hit->m_ray.m_origin - m_basepoint;
-	glm::vec3 dir = hit->m_ray.m_direction; //d not necessarily normalized!
+	glm::vec3 P = ray->m_origin - m_basepoint;
+	glm::vec3 dir = ray->m_direction; //d not necessarily normalized!
 
 	P = glm::vec3(glm::dot(P, m_u), glm::dot(P, m_v), glm::dot(P, m_w));
 	glm::vec3 D(glm::dot(dir, m_u), glm::dot(dir, m_v), glm::dot(dir, m_w));
@@ -111,7 +118,7 @@ bool KIRK::Cylinder::closestIntersection(Intersection *hit, float tMin, float tM
 	case 1:
 		if ((t2 > tMax) || (t2 < tMin))
 			return false;
-		Q = hit->m_ray.followDistance(t2);
+		Q = ray->followDistance(t2);
 		d = glm::dot(m_v, Q);
 		if (d >= m_min_d && d <= m_max_d)
 		{
@@ -125,7 +132,7 @@ bool KIRK::Cylinder::closestIntersection(Intersection *hit, float tMin, float tM
 	case 2:
 		if ((t1 < tMin) && (t2 > tMax))
 			return false;
-		Q = hit->m_ray.followDistance(t1);
+		Q = ray->followDistance(t1);
 		d = glm::dot(m_v, Q);
 		if (d >= m_min_d && d <= m_max_d)
 		{
@@ -134,7 +141,7 @@ bool KIRK::Cylinder::closestIntersection(Intersection *hit, float tMin, float tM
 			return true;
 		}
 		else {
-			Q = hit->m_ray.followDistance(t2);
+			Q = ray->followDistance(t2);
 			d = glm::dot(m_v, Q);
 			if (d >= m_min_d && d <= m_max_d)
 			{

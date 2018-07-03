@@ -18,7 +18,7 @@ class BVHNode : public TreeAccelNode<BVHNode, 2>
 
 public:
     void
-    split(const IdRange &range, const std::vector<KIRK::Triangle *> &objects, std::vector<unsigned int> &object_ids,
+    split(const IdRange &range, const std::vector<KIRK::Object *> &objects, std::vector<unsigned int> &object_ids,
           const BoundingBox &centbox, TreeAccelProperties &p, int depth);
     void traverse(KIRK::Intersection *hit, const glm::vec3 &inv_dir, int dir_sign[3], const float tmin, const float tmax);
     bool
@@ -30,7 +30,7 @@ public:
 private:
     void
     partition(const IdRange &id_range, IdRange &left_range, IdRange &right_range, std::vector<unsigned int> &object_ids,
-              const std::vector<KIRK::Triangle *> &objects, const BoundingBox &centbox, BoundingBox &left_centbox,
+              const std::vector<KIRK::Object *> &objects, const BoundingBox &centbox, BoundingBox &left_centbox,
               BoundingBox &right_centbox);
 
 

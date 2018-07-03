@@ -94,6 +94,8 @@ void KIRK::Mesh::addFurToFaces(unsigned int num_fiber_verts, float fiber_radius)
 		//compute center of the face as fiber start position
 		glm::vec3 pos = (m_vertices[m_faces[f].vertex_index_a].position + m_vertices[m_faces[f].vertex_index_b].position
 					     + m_vertices[m_faces[f].vertex_index_c].position) / 3.0f;
+		//move start position down, otherwise the bottom cylinder will stick out of the ground
+		pos.y -= 0.003f;
 		//Add fiber start position
 		furFace.fiber_positions.push_back(pos);
 		//Add radius for start position
@@ -121,7 +123,7 @@ void KIRK::Mesh::addFurToFaces(unsigned int num_fiber_verts, float fiber_radius)
 		}
 		//Add last vertice with radius of 0 at the end of the fiber
 		//furFace.fiber_positions.push_back(pos + glm::vec3(0.0f, 0.003f, 0.01f));
-		furFace.fiber_radius[furFace.fiber_radius.size()-1] = (0.0f);
+		furFace.fiber_radius[furFace.fiber_radius.size()-1] = 0.0f;
 
 		//Add new furFace to m_furFaces member
 		m_furFibers.push_back(furFace);

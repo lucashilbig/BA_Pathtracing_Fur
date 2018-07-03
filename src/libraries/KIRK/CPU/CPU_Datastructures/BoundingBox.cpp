@@ -114,7 +114,7 @@ CPU::BoundingVolume::BoundingVolume(const glm::vec3 &min, const glm::vec3 &max) 
 {
 }
 
-void CPU::BoundingVolume::computeBoundaries(const std::vector<KIRK::Triangle *> &objects,
+void CPU::BoundingVolume::computeBoundaries(const std::vector<KIRK::Object *> &objects,
                                        const std::vector<unsigned int> &object_ids, const IdRange &id_range)
 {
 	

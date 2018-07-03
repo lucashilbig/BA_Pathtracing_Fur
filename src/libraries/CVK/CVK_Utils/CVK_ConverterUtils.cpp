@@ -280,9 +280,17 @@ namespace CVK
 
 					//Iterate once over all fiber positions of one fiber and create a node with geometry for every cone
 					for (int j = 0; j < mesh.m_furFibers[0].fiber_positions.size() - 1; j++) {
+						//get base and apex position for cone
+						glm::vec3 basepos = mesh.m_furFibers[0].fiber_positions[j];
+						glm::vec3 apexpos = mesh.m_furFibers[0].fiber_positions[j + 1];
+						float baseradius = mesh.m_furFibers[0].fiber_radius[j];
+						//move base position a bit to hide cone edges in the fiber struct
+						basepos -= 0.008f * (apexpos - basepos);
+						//lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
+						baseradius -= (j > 3) ? 0.1f * baseradius : 0.05f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
 						//create CVK::Cone geometry with fiber_positions and fiber_radius
-						std::shared_ptr<CVK::Cone> fur_geometry = std::make_shared<CVK::Cone>(mesh.m_furFibers[0].fiber_positions[j], mesh.m_furFibers[0].fiber_positions[j + 1],
-							mesh.m_furFibers[0].fiber_radius[j], mesh.m_furFibers[0].fiber_radius[j + 1], 5);
+						std::shared_ptr<CVK::Cone> fur_geometry = std::make_shared<CVK::Cone>(basepos, apexpos,
+							baseradius, mesh.m_furFibers[0].fiber_radius[j + 1], 5);
 						//create node for the geometry object
 						std::shared_ptr<CVK::Node> cone_node = std::make_shared<CVK::Node>("Fiber_ConeGeometry_Node");
 						//Assign Cone geometry to node

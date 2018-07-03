@@ -67,8 +67,8 @@ class KDNode : public TreeAccelNode<KDNode, 2>
 
 public:
     KDNode();
-    void split(std::vector<KIRK::Triangle *> &objects, const BoundingBox &box, TreeAccelProperties &p, int depth);
-    void split(const std::vector<KIRK::Triangle *> &objects, std::vector<Plane> ( &planes )[3], const BoundingBox &box,
+    void split(std::vector<KIRK::Object *> &objects, const BoundingBox &box, TreeAccelProperties &p, int depth);
+    void split(const std::vector<KIRK::Object *> &objects, std::vector<Plane> ( &planes )[3], const BoundingBox &box,
                TreeAccelProperties &p, int depth);
     bool traverse(KIRK::Intersection *hit, const glm::vec3 &inv_dir, float tmin, float tmax);
     bool traverse(KIRK::Ray *ray, const glm::vec3 &inv_dir, float tmin, float tmax, float tMax);
@@ -82,11 +82,11 @@ public:
     static const float cKi; // cost for triangle intersection
 
 private:
-    void createLeaf(std::vector<KIRK::Triangle *> &objects, TreeAccelProperties &p, int depth);
-    void createLeaf(const std::vector<KIRK::Triangle *> &objects, const std::vector<Plane> ( &planes )[3],
+    void createLeaf(std::vector<KIRK::Object *> &objects, TreeAccelProperties &p, int depth);
+    void createLeaf(const std::vector<KIRK::Object *> &objects, const std::vector<Plane> ( &planes )[3],
                     TreeAccelProperties &p, int depth);
-    void partition(std::vector<KIRK::Triangle *> &left_range, std::vector<KIRK::Triangle *> &right_range,
-                   std::vector<KIRK::Triangle *> &objects, const BoundingBox &box, BoundingBox &left_box,
+    void partition(std::vector<KIRK::Object *> &left_range, std::vector<KIRK::Object *> &right_range,
+                   std::vector<KIRK::Object *> &objects, const BoundingBox &box, BoundingBox &left_box,
                    BoundingBox &right_box);
 
 };
