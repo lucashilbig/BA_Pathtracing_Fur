@@ -65,10 +65,11 @@ namespace KIRK
 
 		/**
 		Iterates over every Mesh and adds fur fiber information to every face in the meshes.
+		@param fibers_per_face amount of fibers that will be put(uniformly distributed) on a single triangle.
 		@param num_fiber_verts amount of vertices if which the fiber consists. Also determines the length of the fiber since the distance between each vertice is the same.
 		@param fiber_radius is the radius of the fur fiber. Has to be > 0.
 		*/
-		void addFurFibersToAllMeshes(unsigned int num_fiber_verts, float fiber_radius);
+		void addFurFibersToAllMeshes(unsigned int fibers_per_face, unsigned int num_fiber_verts, float fiber_radius);
 
 		/**
 		Imports an .obj file as a SceneNode. The resulting SceneNode has a root-node structure where each child of the returned node is a parent node to a mesh node.

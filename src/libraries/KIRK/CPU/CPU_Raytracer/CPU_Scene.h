@@ -73,6 +73,11 @@ public:
      */
     void setDataStructure(std::unique_ptr <KIRK::CPU::CPU_DataStructure> datastructure, bool buildNew = true);
 
+	/*
+	   When set to true, all fur fibers will be converted to cylinder intersection objects rather than to triangle objects.
+	*/
+	void setFiberAsCylinder(bool fiberAsCylinder) { m_fiberAsCylinder = fiberAsCylinder; }
+
     /**
      * [DEPRICATED]
     * Set the datastructure of the scene by creating a copy of the given datastructure.
@@ -165,6 +170,7 @@ private:
     std::vector <std::unique_ptr<KIRK::Light>> m_lights; //!< the lights of the scene
     std::vector <std::shared_ptr<KIRK::Material>> m_materials; //!< the materials of the scene we dont need to copy so share them
     std::unique_ptr<KIRK::Environment> m_environment; //! the environment of the scene
+	bool m_fiberAsCylinder = true;//! (default)true: fibers are converted to cylinders. false : fibers are converted to triangles. 
 };
 }
 }

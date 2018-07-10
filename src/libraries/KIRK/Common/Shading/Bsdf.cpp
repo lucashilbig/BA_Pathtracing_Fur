@@ -380,4 +380,19 @@ glm::vec3 TransparentBSDF::localSample (const Intersection& hit, const glm::vec3
 }
 
 glm::vec3 TransparentBSDF::evaluateLight (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) { return glm::vec3(.0f); }
+
+
+////////////////////////////////////////////////////////////////////////////////////
+//////////////
+//////////////	MARSCHNER HAIR BSDF
+//////////////
+////////////////////////////////////////////////////////////////////////////////////
+
+glm::vec3 MarschnerHairBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
+{
+	//todo: implement
+	return glm::vec3(.0f);
+}
+
+glm::vec3 MarschnerHairBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) { return glm::vec3(.0f);/*todo: implement*/ }
 }

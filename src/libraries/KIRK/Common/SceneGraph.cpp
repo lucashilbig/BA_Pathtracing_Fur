@@ -312,11 +312,11 @@ void KIRK::SceneGraph::createDefaultEnvironment()
     m_environment->setColor(Color::RGBA(0.7f, 0.9f, 1.f, 1.f));
 }
 
-void KIRK::SceneGraph::addFurFibersToAllMeshes(unsigned int num_fiber_verts, float fiber_radius)
+void KIRK::SceneGraph::addFurFibersToAllMeshes(unsigned int fibers_per_face, unsigned int num_fiber_verts, float fiber_radius)
 {	
 	for each (auto sceneNode in *this) {
 		if (sceneNode->m_data_type == KIRK::SceneNode::MESH)
-			std::dynamic_pointer_cast<KIRK::Mesh>(sceneNode->m_data_object)->addFurToFaces(num_fiber_verts, fiber_radius);
+			std::dynamic_pointer_cast<KIRK::Mesh>(sceneNode->m_data_object)->addFurToFaces(fibers_per_face, num_fiber_verts, fiber_radius);
 	}
 }
 

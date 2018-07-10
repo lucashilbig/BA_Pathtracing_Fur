@@ -92,67 +92,64 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 				tri->setMaterial(mesh->m_materials[face.material_index].get());
 
 				m_scene_objects.push_back(tri);
-			}
+			}						
 
-			//////
-			// FIBER TO TRIANGLE (old variant)
-			//////
-
-			/*//If we have fur fibers in our mesh, we convert them to triangles
+			//If we have fur fibers in our mesh, we convert them to cylinders or triangles
 			if (!mesh->m_furFibers.empty())
 			{
-				//Iterate over every fur fiber
-				for (int i = 0; i < mesh->m_furFibers.size(); i++)
-				{
-					//create triangles from the current fur fiber
-					std::vector<Triangle *> triangles = std::move(fiberToTriangles(mesh->m_furFibers[i], base_transform * child->m_transform, 5));
-					//push triangles to m_scene_objects
-					for (int t = 0; t < triangles.size(); t++)
+				if (m_fiberAsCylinder) {
+					//////
+					// FIBER TO CYLINDER
+					//////
+
+					//transformation of fur fiber
+					glm::mat4 transform = base_transform * child->m_transform;
+					//Material for fur fibers
+					std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat");
+					mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color
+					mat->m_transparency.value = 0.4f;
+					mat->m_reflectivity.value = 0.4f;
+					m_materials.push_back(mat);
+
+					//Iterate over every fur fiber
+					for (int i = 0; i < mesh->m_furFibers.size(); i++)
 					{
-						m_scene_objects.push_back(triangles[t]);
+						KIRK::Mesh::furFiber *fiber = &mesh->m_furFibers[i];
+						//Iterate over every cone in the fur fiber
+						for (int c = 0; c < fiber->fiber_positions.size() - 1; c++)
+						{
+							//get base and apex position for cylinder
+							glm::vec3 basepos = fiber->fiber_positions[c];
+							glm::vec3 apexpos = fiber->fiber_positions[c + 1];
+							float baseradius = fiber->fiber_radius[c];
+							//move base position a bit to hide cone edges in the fiber struct
+							basepos -= 0.008f * (apexpos - basepos);
+							//lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
+							baseradius -= (c > 3) ? 0.1f * baseradius : 0.05f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
+							//create raytracing cylinder object
+							KIRK::Cylinder *obj = new KIRK::Cylinder(basepos, apexpos,
+								baseradius, fiber->fiber_radius[c + 1], &transform);
+							//set cylinder material
+							obj->setMaterial(mat.get());
+							//add object to scene
+							m_scene_objects.push_back(obj);
+						}
 					}
 				}
-			}*/
-			
-
-			//////
-			// FIBER TO CYLINDER
-			//////
-
-			//If we have fur fibers in our mesh, we convert them to Cylinders
-			if (!mesh->m_furFibers.empty())
-			{
-				//transformation of fur fiber
-				glm::mat4 transform = base_transform * child->m_transform;
-				//Material for fur fibers
-				std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat");
-				mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color
-				mat->m_transparency.value = 0.4f;
-				mat->m_reflectivity.value = 0.4f;
-				m_materials.push_back(mat);
-
-				//Iterate over every fur fiber
-				for (int i = 0; i < mesh->m_furFibers.size(); i++)
-				{
-					KIRK::Mesh::furFiber *fiber = &mesh->m_furFibers[i];
-					//Iterate over every cone in the fur fiber
-					for (int c = 0; c < fiber->fiber_positions.size() - 1; c++)
+				else {
+					//////
+					// FIBER TO TRIANGLE
+					//////
+					//Iterate over every fur fiber
+					for (int i = 0; i < mesh->m_furFibers.size(); i++)
 					{
-						//get base and apex position for cylinder
-						glm::vec3 basepos = fiber->fiber_positions[c];
-						glm::vec3 apexpos = fiber->fiber_positions[c + 1];
-						float baseradius = fiber->fiber_radius[c];
-						//move base position a bit to hide cone edges in the fiber struct
-						basepos -= 0.008f * (apexpos - basepos);
-						//lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
-						baseradius -= (c > 3) ? 0.1f * baseradius : 0.05f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
-						//create raytracing cylinder object
-						KIRK::Cylinder *obj = new KIRK::Cylinder(basepos, apexpos,
-							baseradius, fiber->fiber_radius[c+1], &transform);
-						//set cylinder material
-						obj->setMaterial(mat.get());
-						//add object to scene
-						m_scene_objects.push_back(obj);
+						//create triangles from the current fur fiber
+						std::vector<Triangle *> triangles = std::move(fiberToTriangles(mesh->m_furFibers[i], base_transform * child->m_transform, 5));
+						//push triangles to m_scene_objects
+						for (int t = 0; t < triangles.size(); t++)
+						{
+							m_scene_objects.push_back(triangles[t]);
+						}
 					}
 				}
 			}
@@ -229,7 +226,7 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 	std::vector<Triangle *> triangles;
 	std::vector<glm::vec4> m_vertices, m_normals;
 	std::vector<glm::vec2> m_uvs;
-	
+
 	float u, v;
 	float radius, phi;
 	glm::vec3 q;
@@ -249,7 +246,7 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 	{
 		//initialise cone specific variables
 		glm::vec3 m_basepoint = fiber.fiber_positions[c];
-		glm::vec3 m_apexpoint = fiber.fiber_positions[c+1];		
+		glm::vec3 m_apexpoint = fiber.fiber_positions[c + 1];
 		int offset = 0;
 		m_v = m_apexpoint - m_basepoint;
 		m_height = glm::length(m_v);
@@ -267,7 +264,7 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 		m_u = glm::normalize(glm::cross(m_v, tmp));
 		m_w = glm::normalize(glm::cross(m_u, m_v));
 
-		m_slope = (fiber.fiber_radius[c] - fiber.fiber_radius[c+1]) / m_height;
+		m_slope = (fiber.fiber_radius[c] - fiber.fiber_radius[c + 1]) / m_height;
 
 		// Envelope
 		for (j = 0; j <= resolution; j++)  //radius

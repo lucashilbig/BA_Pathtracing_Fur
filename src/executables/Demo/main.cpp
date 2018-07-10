@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
 	//jsonio::writeScene(scene, std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/")));
 
 	//Apply fur on every triangle in the scene. For testing purpose.
-	scene->addFurFibersToAllMeshes(10, 0.004f);//0.004f
+	scene->addFurFibersToAllMeshes(5, 10, 0.004f);//0.004f
 
 	//////////////////////////////////////////////
 	//

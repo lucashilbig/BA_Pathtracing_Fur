@@ -184,5 +184,16 @@ public:
 
 const BsdfRegistrator <TransparentBSDF> transparentBSDFRegistrator("TransparentBSDF");
 
+////////////////////////////////////////////////////////////////////////////////////
+class MarschnerHairBSDF
+{
+public:
+	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, const glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
+
+	static glm::vec3 evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray);
+};
+
+const BsdfRegistrator <MarschnerHairBSDF> marschnerHairBSDFRegistrator("MarschnerHairBSDF");
+
 }
 #endif

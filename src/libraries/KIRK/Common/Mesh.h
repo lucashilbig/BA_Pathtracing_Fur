@@ -57,10 +57,11 @@ namespace KIRK
 		/**
 		Adds fur fiber Information for every face in m_faces and saves them in m_furFibers.
 		This will add fiber_position and fiber_radius at the center of the face.
+		@param fibers_per_face amount of fibers that will be put(uniformly distributed) on a single triangle(face).
 		@param num_fiber_verts amount of vertices if which the fiber consists. Also determines the length of the fiber.
 		@param fiber_radius is the radius of the fur fiber. Has to be > 0.
 		*/
-		void addFurToFaces(unsigned int num_fiber_verts, float fiber_radius);
+		void addFurToFaces(unsigned int fibers_per_face, unsigned int num_fiber_verts, float fiber_radius);
 
 
         std::vector<vertex> m_vertices;			//!< All vertices contained in this mesh.
