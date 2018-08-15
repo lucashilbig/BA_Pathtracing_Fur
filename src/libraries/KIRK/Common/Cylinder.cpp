@@ -12,7 +12,7 @@ KIRK::Cylinder::Cylinder(glm::vec3 basePoint, glm::vec3 apexPoint, float baseRad
 	m_apexradius = apexRadius;
 
 	//pre-calculated axis of the objects local space
-	m_v = apexPoint - basePoint;//v-axis(vector at the center of the cylinder)
+	m_v = apexPoint - basePoint;//v-axis(vector through the center of the cylinder(apexpoint - basepoint))
 	m_height = glm::length(m_v);
 	m_v = glm::normalize(m_v);
 

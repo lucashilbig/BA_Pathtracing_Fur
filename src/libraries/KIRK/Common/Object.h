@@ -13,6 +13,8 @@ namespace KIRK {
 	class Object
 	{
 	public:
+		Object() {};
+		virtual ~Object() {};
 
 		virtual bool closestIntersection(Intersection *hit, float tMin, float tMax) = 0;
 		virtual bool isIntersection(Ray *ray, float tMax) = 0;

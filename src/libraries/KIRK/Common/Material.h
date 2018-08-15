@@ -28,7 +28,9 @@ A collection of possible texture/color map types.
 		TRANSPARENCY,
 		REFLECTIVITY,
 		ROUGHNESS,
-		BUMP
+		BUMP,
+		ALPHA_LOBESHIFT,//longditudinal shift of a hair lobe. Between -10 and -5 degrees (marschner hairmodel property)
+		BETA_LOBEWIDTH//longditudinal width (standart derivation) of a hair lobe. Between 5 and 10 degrees (marschner hairmodel property)
 	};
 
 	/**
@@ -75,6 +77,10 @@ A collection of possible texture/color map types.
 		MatParamFloat m_reflectivity = { 0.f };					//!< Material reflectivity. Nothing to say here.
 		MatParamFloat m_roughness = { 1.f };					//!< Material roughness. Used for reflections and refractions.
 		MatParamFloat m_bump = { 0.f };					//!< Bump map and it's strength.
+
+		//Marschner hair properties
+		MatParamFloat m_alpha_shift = { 0.f };	//!< longditudinal shift of a hair lobe. Between -10 and -5 degrees. Stored in radians.
+		MatParamFloat m_beta_width = { 0.f };	//!< longditudinal width (standart derivation) of a hair lobe. Between 5 and 10 degrees. Stored in radians.
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		std::string name = "";		//!< Material name. This one is unique!
@@ -210,6 +216,20 @@ A collection of possible texture/color map types.
 	{
 		return getFromParam(m_bump, texcoord);
 	}	
+
+	//ALPHA_LOBESHIFT value
+	template<>
+	inline float Material::fetchParameterFloat<MatParamType::ALPHA_LOBESHIFT>(const glm::vec2 &texcoord) const
+	{
+		return getFromParam(m_alpha_shift, texcoord);
+	}
+
+	//BETA_LOBEWIDTH value
+	template<>
+	inline float Material::fetchParameterFloat<MatParamType::BETA_LOBEWIDTH>(const glm::vec2 &texcoord) const
+	{
+		return getFromParam(m_beta_width, texcoord);
+	}
 }
 
 #endif //KIRK_MATERIAL_H

@@ -88,8 +88,9 @@ void KIRK::Mesh::addFurToFaces(unsigned int fibers_per_face, unsigned int num_fi
 		return;
 	}
 	//random value generator
-	std::default_random_engine generator;
-	std::uniform_real_distribution<float> distribution(0.0, 1.0);
+	std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_real_distribution<float> dist(0.0f, std::nextafter(1.0f, DBL_MAX));//std::nextafter so we get the [0,1] interval instead of [0,1)
 
 	//Iterate over every face in the mesh
 	for (int f = 0; f < m_faces.size(); f++)
@@ -104,8 +105,8 @@ void KIRK::Mesh::addFurToFaces(unsigned int fibers_per_face, unsigned int num_fi
 			glm::vec3 b = m_vertices[m_faces[f].vertex_index_b].position;
 			glm::vec3 c = m_vertices[m_faces[f].vertex_index_c].position;
 			//compute random values for position calculation
-			float r1 = distribution(generator);
-			float r2 = distribution(generator);
+			float r1 = dist(mt);
+			float r2 = dist(mt);
 			if (r1 + r2 >= 1) { r1 = 1 - r1; r2 = 1 - r2; }//edge-case. Otherwise point would be outside the triangle
 			//compute fiber start position 
 			glm::vec3 pos = a + r1 * (b - a) + r2 * (c - a);

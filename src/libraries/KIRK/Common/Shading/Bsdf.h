@@ -18,6 +18,33 @@ public:
 	static const int MATFLAG_TRANSPARENT_BOUNCE = 1 << 0;
 	static const int MATFLAG_SPECULAR_BOUNCE = 1 << 1;
 	static const int MATFLAG_EMISSIVE_BOUNCE = 1 << 2;
+	static const int MATFLAG_CYLINDER_T_BOUNCE = 1 << 3;
+	static const int MATFLAG_CYLINDER_TR_BOUNCE = 1 << 4;
+
+
+	/**
+	* @brief solve cubic equation x^3 + a*x^2 + b*x + c = 0
+	* @param *x array of size 3
+	* @return In case 3 real roots: => x[0], x[1], x[2], return 3
+	*         2 real roots: x[0], x[1],          return 2
+	*         1 real root : x[0], x[1] ± i*x[2], return 1
+	*
+	// Credit for this Method goes to: poly34.h : solution of cubic and quartic equation
+	// (c) Khashin S.I. http://math.ivanovo.ac.ru/dalgebra/Khashin/index.html
+	// khash2 (at) gmail.com
+	*/
+	static int SolveP3(double *x, double a, double b, double c);
+
+	/**
+	* @brief Calculate normalized gaussian probability density function
+	* @param x The functions x value
+	* @param mean The functions mean value mu
+	* @param stdder The functions standart derivation sigma
+	* @return float between 0 and 1
+	*/
+	static float normal_gauss_pdf(float x, float mean, float stdder);
+
+
 	/**
 	* @brief Calculate the Fresnel value with Schlick's formula which is much easier to understand and should be short and therefore pretty fast.
 	* @param view The negative ray direction
@@ -47,6 +74,13 @@ public:
 	static glm::vec3 cosineSampleHemisphere (const glm::vec2& randoms);
 	static glm::vec3 uniformSphereSample(float u, float v);
 	static float dialectricFresnel (const float cos_theta, float eta_i, float eta_t);
+
+private:
+	//=============================================================================
+	// _root3, root3 from http://prografix.narod.ru
+	//=============================================================================
+	static double _root3(double x);
+	static double root3(double x);
 };
 
 typedef std::function <glm::vec3 (const Intersection&, const glm::vec3&, const glm::vec3&, const glm::vec2, glm::vec3&, float&, int&, bool)> localSample_func;

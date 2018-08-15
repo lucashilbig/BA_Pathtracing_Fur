@@ -35,8 +35,8 @@ namespace KIRK
             ImGui::PushID(("mat_id_" + name).c_str());
 
             int oldcb = m_current_bsdf;
-            const char *names[] = {"Diffuse", "Glossy", "Glass", "Translucent", "Emission", "Transparent"};
-            ImGui::Combo("BSDF", &m_current_bsdf, names, 6);
+            const char *names[] = {"Diffuse", "Glossy", "Glass", "Translucent", "Emission", "Transparent", "MarschnerHair"};
+            ImGui::Combo("BSDF", &m_current_bsdf, names, 7);
 
             if(m_current_bsdf != oldcb)
             {
@@ -67,6 +67,10 @@ namespace KIRK
                         m_bsdf = std::make_shared<BSDF>("TransparentBSDF", TransparentBSDF::localSample,
                                                         TransparentBSDF::evaluateLight);
                         break;
+					case 6:
+						m_bsdf = std::make_shared<BSDF>("MarschnerHairBSDF", MarschnerHairBSDF::localSample,
+							MarschnerHairBSDF::evaluateLight);
+						break;
                     default:
                         break;
                 }

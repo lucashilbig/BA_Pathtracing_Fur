@@ -24,14 +24,15 @@ namespace KIRK {
 		void calcTcoord(Intersection *hit) override;
 		void calcNormal(Intersection *hit) override;
 		bool isInAABB(glm::vec3 *bbox) override;
+		glm::vec3 getU() const { return m_u; }
+		glm::vec3 getV() const { return m_v; }
+		glm::vec3 getW() const { return m_w; }
+		float getBaseRadius() const { return m_baseradius; }
+		float getApexRadius() const { return m_apexradius; }
 
 		/*glm::vec3 *getBasePoint() { return &m_basepoint; }
-		glm::vec3 *getApexPoint() { return &m_apexpoint; }
-		glm::vec3 getU() { return &m_u; }
-		glm::vec3 getV() { return &m_v; }
-		glm::vec3 getW() { return &m_w; }
-		float getBaseRadius() { return m_baseradius; }
-		float getApexRadius() { return m_apexradius; }*/
+		glm::vec3 *getApexPoint() { return &m_apexpoint; }		
+		*/
 
 	private:
 		void computeBounds() override;//calculates Cylinders BoundingBox in WorldSpace
