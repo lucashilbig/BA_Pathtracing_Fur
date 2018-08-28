@@ -153,7 +153,7 @@ namespace CVK
 					m_nodes.push_back(light_node);
 					//Node and Geometry for the Light direction
 					std::shared_ptr<CVK::Node> light_node_dir = std::make_shared<CVK::Node>("Light_Geometry_Node");
-					std::shared_ptr<CVK::Cone> light_geometry_dir = std::make_shared<CVK::Cone>(light->m_position, light->m_direction, 0.05f, 0.0f , 5);//cone for lights direction
+					std::shared_ptr<CVK::Cone> light_geometry_dir = std::make_shared<CVK::Cone>(light->m_position, glm::normalize(light->m_direction), 0.05f, 0.0f , 5);//cone for lights direction
 					 //set geometry and transform for node
 					light_node_dir->setGeometry(light_geometry_dir);
 					light_node_dir->setModelMatrix(trans);

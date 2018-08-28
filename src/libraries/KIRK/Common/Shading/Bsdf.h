@@ -39,10 +39,10 @@ public:
 	* @brief Calculate normalized gaussian probability density function
 	* @param x The functions x value
 	* @param mean The functions mean value mu
-	* @param stdder The functions standart derivation sigma
+	* @param stdder The functions standart deviation sigma
 	* @return float between 0 and 1
 	*/
-	static float normal_gauss_pdf(float x, float mean, float stdder);
+	static float normal_gauss_pdf(float x, float mean, float stddev);
 
 
 	/**
@@ -83,7 +83,7 @@ private:
 	static double root3(double x);
 };
 
-typedef std::function <glm::vec3 (const Intersection&, const glm::vec3&, const glm::vec3&, const glm::vec2, glm::vec3&, float&, int&, bool)> localSample_func;
+typedef std::function <glm::vec3 (const Intersection&, const glm::vec3&, const glm::vec3&, glm::vec2&, glm::vec3&, float&, int&, bool)> localSample_func;
 typedef std::function <glm::vec3 (const Intersection&, const glm::vec3&, const glm::vec3&)> evaluateLight_func;
 
 class BSDF
@@ -102,7 +102,7 @@ public:
 	* @param u random numbers in range [0;1]
 	* @return the amount of reflected/transmitted energy
 	*/
-	glm::vec3 sample (const Intersection& hit, const glm::vec3& ray_in, const glm::vec3& normal, glm::vec3& ray_out, float& pdf, int& mat_flags, const glm::vec2& u, bool useRadianceOverImportance = true) const;
+	glm::vec3 sample (const Intersection& hit, const glm::vec3& ray_in, const glm::vec3& normal, glm::vec3& ray_out, float& pdf, int& mat_flags, glm::vec2& u, bool useRadianceOverImportance = true) const;
 
     /** evaluateLight
 	* Evaluates the light influence on the hit point.
@@ -222,12 +222,23 @@ const BsdfRegistrator <TransparentBSDF> transparentBSDFRegistrator("TransparentB
 class MarschnerHairBSDF
 {
 public:
-	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, const glm::vec2 sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
+	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
 
 	static glm::vec3 evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray);
 };
 
 const BsdfRegistrator <MarschnerHairBSDF> marschnerHairBSDFRegistrator("MarschnerHairBSDF");
+
+////////////////////////////////////////////////////////////////////////////////////
+class DEonHairBSDF
+{
+public:
+	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
+
+	static glm::vec3 evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray);
+};
+
+const BsdfRegistrator <DEonHairBSDF> dEonHairBSDFRegistrator("DEonHairBSDF");
 
 }
 #endif

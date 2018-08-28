@@ -126,7 +126,7 @@ void KIRK::Mesh::addFurToFaces(unsigned int fibers_per_face, unsigned int num_fi
 				//the distance between two vertices is getting smaller towards the end (top) of the fiber.
 				float offset_y = glm::log((float)i) / 90.0f;
 				//compute new position of fiber vertice
-				glm::vec3 point = pos + glm::vec3(0.0f, offset_y, 0.03f); // Param b ändert Krümmung des Haares an sich. Param c ändert Neigung aller Haare.
+				glm::vec3 point = pos + glm::vec3(0.0f, offset_y, 0.06f); // Param b ändert Krümmung des Haares an sich. Param c ändert Neigung aller Haare.
 				//calculate the new offset (z-axis)
 				offset_z -= (offset_z / ((float)i + 5));
 				//decrease radius towards the top of the fiber
@@ -139,7 +139,7 @@ void KIRK::Mesh::addFurToFaces(unsigned int fibers_per_face, unsigned int num_fi
 			}
 			//Add last vertice with radius of 0 at the end of the fiber
 			//furFace.fiber_positions.push_back(pos + glm::vec3(0.0f, 0.003f, 0.01f));
-			furFace.fiber_radius[furFace.fiber_radius.size() - 1] = 0.0f;
+			furFace.fiber_radius[furFace.fiber_radius.size() - 1] = 0.001f;
 
 			//Add new furFace to m_furFaces member
 			m_furFibers.push_back(furFace);

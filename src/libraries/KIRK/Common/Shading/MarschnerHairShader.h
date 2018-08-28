@@ -26,53 +26,60 @@ namespace KIRK {
 		Color::RGBA calcDirectLight(KIRK::CPU::PathTracer& pathtracer, const KIRK::Intersection& hit, const glm::vec2 sample) const;
 	};
 
-	const ShaderRegistrator<MarschnerHairShader> simpleShaderRegistrator("MarschnerHairShader");
+	const ShaderRegistrator <MarschnerHairShader> MarschnerHairShaderRegistrator("MarschnerHairShader");
 
 	inline void MarschnerHairShader::shade(KIRK::CPU::PathTracer& pathtracer, const KIRK::Intersection& hit, KIRK::CPU::Bounce& resultBounce, KIRK::Ray& resultRay)
 	{
-		Color::RGBA accumulatedColor(0.0f);
-		Color::RGBA directLight;
-		Color::RGBA ambientLight;
-
 		glm::vec3 counter_ray = -normalize(resultRay.m_direction);
 		Material* material = hit.m_object->getMaterial();
 		std::shared_ptr<BSDF> bsdf = material->m_bsdf;
-		glm::vec2 sample = pathtracer.getSampler().sample2D();
+		glm::vec2 sample(0.f);
 
 		glm::vec3 result_direction; // reflected/refracted ray
-		float pdf; // probability distribution function
+		float pdf; // probability distribution function		
 
 		// how much light (r, g, b) gets reflected in this hit point
 		glm::vec3 reflectance = bsdf->sample(hit, counter_ray, hit.m_normal, result_direction, pdf, resultBounce.mat_flags, sample); // Sample bsdf
 		 
 		//offset for new ray, so it doesnt hit the same object directly again
 		glm::vec3 offset = 1e-4f * result_direction;
+
+		// If it was not a specular bounce, we optimise the offset for that case 
+		if (!(resultBounce.mat_flags & BSDFHelper::MATFLAG_SPECULAR_BOUNCE))
+		{
+			offset = 1e-4f * hit.m_normal;
+			offset = glm::faceforward(-offset, hit.m_normal, result_direction);
+		}
+
+		//New Ray to follow
 		resultRay = KIRK::Ray(hit.m_location + offset, result_direction);
 
 		//If we have an unfinished TT-/TRT-Path we dont have to calculate the color/radiance yet
 		if ((resultBounce.mat_flags & BSDFHelper::MATFLAG_CYLINDER_T_BOUNCE) || (resultBounce.mat_flags & BSDFHelper::MATFLAG_CYLINDER_TR_BOUNCE))
 			return;
+				
+
+		//Color vectors
+		Color::RGBA accumulatedColor(0.0f);
+		Color::RGBA ambientLight;
+		Color::RGBA directLight;
 
 		//Ambient light
 		ambientLight = pathtracer.getScene().getEnvironment().getAmbientLight() * glm::vec4(bsdf->evaluateLight(hit, hit.m_normal, hit.m_normal) * glm::one_over_pi<float>(), 1.0f);
+		
+		//Calculate direct Light from all light Sources. 
+		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());
 
-		//Calculate direct Light from all light Sources
-		directLight = calcDirectLight(pathtracer, hit, sample);
+		//Add color from light sources together
 		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);
 		accumulatedColor += ambientLight * glm::vec4(resultBounce.radiance, 1.0f);
-
-
-		if (reflectance == glm::vec3(0.f) || pdf <= 1E-4f
-			|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
-		{
+		
+		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
+		if (reflectance == glm::vec3(0.f) || pdf <= 1E-4f || std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 			resultBounce.radiance = glm::vec3(0);
-			resultBounce.color += accumulatedColor;
-			//We can return here, bc all following stuff is not needed anymore.
-			return;
-		}
+		else
+			resultBounce.radiance *= reflectance * glm::abs(glm::cos(sample.x));
 
-		// Accumulate indirect lighting and divide by pdf to remove bias
-		resultBounce.radiance += reflectance * glm::abs(glm::dot(result_direction, hit.m_normal)) / pdf;
 		resultBounce.color += accumulatedColor;
 	}
 

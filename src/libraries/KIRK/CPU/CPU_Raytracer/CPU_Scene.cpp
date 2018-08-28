@@ -100,27 +100,16 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 				if (m_fiberAsCylinder) {
 					//////
 					// FIBER TO CYLINDER
-					//////
-
-					//random value generator
-					std::random_device rd;
-					std::mt19937 mt(rd());
-					std::uniform_real_distribution<float> dist(5.0f, std::nextafter(10.0f, DBL_MAX));//std::nextafter so we get the [5,10] interval instead of [5,10)
+					//////									
 
 					//transformation of fur fiber
 					glm::mat4 transform = base_transform * child->m_transform;
-					//Material for fur fibers
-					std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat");
-					mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color
-					mat->m_transparency.value = 0.4f;
-					mat->m_reflectivity.value = 0.4f;
+					//Material for fur fibers with marschnerHairBSDF and -Shader
+					std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat", true);//Boolean to call the constructor which uses MarschnerHairBSDF and -Shader
+					mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color 0.545f, 0.353f, 0.169f
 					mat->m_ior = 1.55f;//suggested value from marschner hair paper
-					mat->m_alpha_shift.value = glm::radians(-1.0f * dist(mt));//suggested value from marschner hair paper between -10 and -5 degrees
-					mat->m_beta_width.value = glm::radians(dist(mt));//suggested value from marschner hair paper between 5 and 10 degrees
-					mat->m_bsdf = std::make_shared<BSDF>("MarschnerHairBSDF", MarschnerHairBSDF::localSample, MarschnerHairBSDF::evaluateLight);//Use marschner hair bsdf in case we use cylinder objects
-					mat->m_current_bsdf = 6;
-					mat->m_shader =  std::make_shared<Shader>("MarschnerHairShader");//Use marschner hair shader together with bsdf
 					m_materials.push_back(mat);
+					mesh->m_materials.push_back(mat);
 
 					//Iterate over every fur fiber
 					for (int i = 0; i < mesh->m_furFibers.size(); i++)

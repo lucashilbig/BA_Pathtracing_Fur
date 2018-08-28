@@ -216,7 +216,6 @@ int main(int argc, char *argv[])
 	//Load up scene.
 	std::shared_ptr<KIRK::SceneGraph> scene(KIRK::SceneGraph::makeSceneGraph(file));
 
-	
 
 	//Initializing environment map (cubeMap here)
 	scene->getEnvironment()->loadCubeMap(RESOURCES_PATH "/cubeMap/posx.jpg",
@@ -266,7 +265,8 @@ int main(int argc, char *argv[])
 	cpu_pathtracer->init(cpu_scene);
 
 	//Set some cpu_pathtracer and bidirectional cpu_pathtracer settings.
-	cpu_pathtracer->setSampleCount(20);
+	cpu_pathtracer->setSampleCount(100);
+	cpu_pathtracer->setDepth(5);
 
 	//set default raytracer
 	m_active_cpu_raytracer = cpu_pathtracer;

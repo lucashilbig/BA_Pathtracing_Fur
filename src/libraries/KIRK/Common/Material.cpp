@@ -1,11 +1,15 @@
 #include "Material.h"
 #include "Shading/Bsdf.h"
 #include "Shading/SimpleShader.h"
+#include "Shading/MarschnerHairShader.h"
 
 namespace KIRK
 {
 
     KIRK::Material::Material(std::string name) : KIRK::GuiElement(), name(name), m_bsdf(std::make_shared<BSDF>("LambertianReflectionBSDF", LambertianReflectionBSDF::localSample, LambertianReflectionBSDF::evaluateLight)), m_shader(new SimpleShader("default"))
+	{}
+
+	KIRK::Material::Material(std::string name, bool marschnerHair) : KIRK::GuiElement(), name(name), m_bsdf(std::make_shared<BSDF>("MarschnerHairBSDF", MarschnerHairBSDF::localSample, MarschnerHairBSDF::evaluateLight)), m_shader(new MarschnerHairShader("marschnerHair")), m_current_bsdf(6)
 	{}
 
 	KIRK::Color::RGBA KIRK::Material::getFromParam(const MatParamColor &colorParam, const glm::vec2 &texcoord) const
@@ -35,8 +39,8 @@ namespace KIRK
             ImGui::PushID(("mat_id_" + name).c_str());
 
             int oldcb = m_current_bsdf;
-            const char *names[] = {"Diffuse", "Glossy", "Glass", "Translucent", "Emission", "Transparent", "MarschnerHair"};
-            ImGui::Combo("BSDF", &m_current_bsdf, names, 7);
+            const char *names[] = {"Diffuse", "Glossy", "Glass", "Translucent", "Emission", "Transparent", "MarschnerHair", "DEonHair"};
+            ImGui::Combo("BSDF", &m_current_bsdf, names, 8);
 
             if(m_current_bsdf != oldcb)
             {
@@ -70,6 +74,10 @@ namespace KIRK
 					case 6:
 						m_bsdf = std::make_shared<BSDF>("MarschnerHairBSDF", MarschnerHairBSDF::localSample,
 							MarschnerHairBSDF::evaluateLight);
+						break;
+					case 7:
+						m_bsdf = std::make_shared<BSDF>("DEonHairBSDF", DEonHairBSDF::localSample,
+							DEonHairBSDF::evaluateLight);
 						break;
                     default:
                         break;
