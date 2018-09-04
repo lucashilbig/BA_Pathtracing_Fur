@@ -63,8 +63,8 @@ void KIRK::CPU::Scene::updateFromSceneGraph(bool updateAll)
 
 	if (updateAll)
 	{
-		flattenNode(m_sceneGraph.lock()->getRootNode(), glm::mat4(1.0f));
-
+		//TODO remove comment after intersection tests
+		//flattenNode(m_sceneGraph.lock()->getRootNode(), glm::mat4(1.0f));
 		computeBounds();
 		buildDatastructure();
 	}

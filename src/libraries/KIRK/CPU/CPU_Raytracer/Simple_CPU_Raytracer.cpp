@@ -66,6 +66,8 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::trace(Ray &ray, int level, floa
 		//if we have marschnerHairBSDF we use the specific shade method
 		if (hit.m_object->getMaterial()->m_current_bsdf == 6)
 			return shadeMarschnerHair(hit, level, weight);
+		else if(hit.m_object->getMaterial()->m_current_bsdf == 10)//TODO remove after intersection test
+			return shadeIntersectionTest(hit);
 		else//we use standart shade method
 			return shade(hit, level, weight);
 	}
@@ -353,7 +355,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::poissonDiskSampling(int x, int 
 KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shade(Intersection &hit, int level, float weight)
 {
 	// get the objected we hit. static_cast cause we checked correct object type in render method already
-	Triangle *obj = static_cast<KIRK::Triangle*>(hit.m_object);
+	Object *obj = static_cast<KIRK::Object*>(hit.m_object);
 
 	// calculation of the normal
 	obj->calcNormal(&hit);
@@ -757,6 +759,10 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 
 }
 
+KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeIntersectionTest(Intersection &hit)
+{
+
+}
 
 void KIRK::CPU::SimpleCPURaytracer::onGui()
 {

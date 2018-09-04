@@ -217,6 +217,8 @@ namespace KIRK
 			*/
 			KIRK::Color::RGBA shadeMarschnerHair(Intersection &hit, int level, float weight);
 
+			KIRK::Color::RGBA shadeIntersectionTest(Intersection &hit);//TODO remove after intersection test
+
 			// Predefined PoissonDisks for poissonDisk Sampling
 			std::vector<std::vector<PoissonGenerator::sPoint>> m_poissonDisks{
 				{ { 0.876225f,0.73452f },{ 0.270721f,0.308664f } },

@@ -142,6 +142,10 @@ public:
      */
     KIRK::Environment& getEnvironment() {return *m_environment;}
 
+	//TODO set to private again after intersection tests
+	std::vector<Object *> m_scene_objects; //!< all Objects of the scene
+	std::vector <std::shared_ptr<KIRK::Material>> m_materials; //!< the materials of the scene we dont need to copy so share them
+
 private:
     /**
      Makes CVK::Triangles from KIRK::Meshes and transforms them.
@@ -170,13 +174,11 @@ private:
 	std::vector<Triangle *> fiberToTriangles(KIRK::Mesh::furFiber fiber, glm::mat4 mesh_transform, unsigned int resolution);
 
     glm::vec3 m_bound[2]; //!< Bounding limits of the whole scene.
-    std::vector<Object *> m_scene_objects; //!< all Objects of the scene
     std::weak_ptr <KIRK::SceneGraph> m_sceneGraph; //!< Remember what scene you were created from. "Scene, I am your father!"
     std::unique_ptr <KIRK::CPU::CPU_DataStructure> m_datastructure; //!< The datastructure to be created from this scene.
 
     std::unique_ptr<KIRK::Camera> m_camera; //!< the camera we want to render from
     std::vector <std::unique_ptr<KIRK::Light>> m_lights; //!< the lights of the scene
-    std::vector <std::shared_ptr<KIRK::Material>> m_materials; //!< the materials of the scene we dont need to copy so share them
     std::unique_ptr<KIRK::Environment> m_environment; //! the environment of the scene
 	bool m_fiberAsCylinder = true;//! (default)true: fibers are converted to cylinders. false : fibers are converted to triangles. 
 };
