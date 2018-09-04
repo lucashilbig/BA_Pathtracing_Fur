@@ -45,6 +45,14 @@ public:
      * */
     Scene(std::weak_ptr <KIRK::SceneGraph> sceneGraph, std::unique_ptr <KIRK::CPU::CPU_DataStructure> datastructure);
 
+	/**
+	* The overloaded constructor for KIRK::SceneGraph
+	* @param sceneGraph give a shared pointer to the sceneGraph you want to render
+	* @param datastructure create a datastructur of the type you want to use and transfer ownership to the scene
+	* @param fiberAsCylinder If set to true fibers will be created as Cylinder Objects rather than triangle objects.
+	* */
+	Scene(std::weak_ptr <KIRK::SceneGraph> sceneGraph, std::unique_ptr <KIRK::CPU::CPU_DataStructure> datastructure, bool fiberAsCylinder);
+
     /** non copy and non moveable (add copy constructor yourself if you need one :p)*/
     Scene(Scene &other) = delete;
     Scene(Scene &&other) = delete;

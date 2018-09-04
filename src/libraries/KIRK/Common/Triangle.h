@@ -11,8 +11,8 @@ namespace KIRK {
  * middle vertex and _c is always referring to the vertex with highest value
  * on longest axis. The longest axis is computed with the bb, which is stored
  * in bounds[]. Because of the ordering explained above, the .cpp file
- * is a mess... Furthermore m_u referrs to the vector between _a and _b, m_uv
- * refers to the vector between _b and _c and m_v refers to the vector between
+ * is a mess... Furthermore m_ab referrs to the vector between _a and _b, m_bc
+ * refers to the vector between _b and _c and m_ac refers to the vector between
  * _a and _c, which is the longest one. All these Attributes are needed for
  * faster voxelization.
 */
@@ -34,12 +34,9 @@ public:
     glm::vec3 *getA() { return &m_A; }
     glm::vec3 *getB() { return &m_B; }
     glm::vec3 *getC() { return &m_C; }
-    glm::vec3 *getU() { return &m_u; }
-    glm::vec3 *getV() { return &m_v; }
-    glm::vec3 *getUV() { return &m_uv; }
-    glm::vec3 *getVecAB() { return &m_u; }
-    glm::vec3 *getVecAC() { return &m_v; }
-    glm::vec3 *getVecBC() { return &m_uv; }
+    glm::vec3 *getVecAB() { return &m_ab; }//previously named u
+    glm::vec3 *getVecAC() { return &m_ac; }//previously named v
+    glm::vec3 *getVecBC() { return &m_bc; }//previously named uv
 	
     int geti0() { return i0; }
     int geti1() { return i1; }
@@ -52,7 +49,7 @@ private:
 
 	bool testAxis(const glm::vec3 e, const glm::vec3 v[], const glm::vec3 boxhalfsize, const int i, const int j, const int vi1, const int vi2, const int f, float &min, float &max, float &p0, float &p2, float &rad);
 		
-    glm::vec3 m_A, m_B, m_C, m_u, m_v, m_uv, m_Normal;
+    glm::vec3 m_A, m_B, m_C, m_ab, m_ac, m_bc, m_Normal;
     glm::vec3 m_na, m_nb, m_nc;
     glm::vec2 m_tca, m_tcb, m_tcc;
 

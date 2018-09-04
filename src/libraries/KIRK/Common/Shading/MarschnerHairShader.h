@@ -78,7 +78,7 @@ namespace KIRK {
 		if (reflectance == glm::vec3(0.f) || pdf <= 1E-4f || std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 			resultBounce.radiance = glm::vec3(0);
 		else
-			resultBounce.radiance *= reflectance * glm::abs(glm::cos(sample.x));
+			resultBounce.radiance *= 3 * reflectance * glm::abs(glm::cos(sample.x));//TOdo
 
 		resultBounce.color += accumulatedColor;
 	}

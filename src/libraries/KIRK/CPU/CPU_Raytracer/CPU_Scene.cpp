@@ -8,6 +8,13 @@ KIRK::CPU::Scene::Scene(std::weak_ptr<KIRK::SceneGraph> sceneGraph, std::unique_
 	setSceneGraph(sceneGraph);
 }
 
+KIRK::CPU::Scene::Scene(std::weak_ptr<KIRK::SceneGraph> sceneGraph, std::unique_ptr<CPU_DataStructure> datastructure, bool fiberAsCylinder)
+{
+	m_fiberAsCylinder = fiberAsCylinder;
+	setDataStructure(std::move(datastructure), false);
+	setSceneGraph(sceneGraph);
+}
+
 KIRK::CPU::Scene::~Scene()
 {
 	for (unsigned int i = 0; i < m_scene_objects.size(); i++)
@@ -145,6 +152,8 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 					{
 						//create triangles from the current fur fiber
 						std::vector<Triangle *> triangles = std::move(fiberToTriangles(mesh->m_furFibers[i], base_transform * child->m_transform, 5));
+						//push triangle material to mesh material list, so we can see it in our gui
+						mesh->m_materials.push_back(std::shared_ptr<KIRK::Material>(triangles[0]->getMaterial()));
 						//push triangles to m_scene_objects
 						for (int t = 0; t < triangles.size(); t++)
 						{
@@ -234,11 +243,10 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 	glm::vec3 n1, n2, n;
 	glm::vec3 m_v, m_u, m_w;
 	float m_height, m_slope;
-	//Material for hair fibers
-	std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat");
-	mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color
-	mat->m_transparency.value = 0.4f;
-	mat->m_reflectivity.value = 0.4f;
+	//Material for fur fibers with marschnerHairBSDF and -Shader
+	std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat", true);//Boolean to call the constructor which uses MarschnerHairBSDF and -Shader
+	mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color 0.545f, 0.353f, 0.169f
+	mat->m_ior = 1.55f;//suggested value from marschner hair paper
 	m_materials.push_back(mat);
 
 	//Iterate over every cone in the fur fiber
@@ -306,6 +314,9 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 					m_uvs[offset + i],
 					m_uvs[offset + i + 1]);
 				tri1->setMaterial(mat.get());
+				tri1->setU(m_u);
+				tri1->setV(m_v);
+				tri1->setW(m_w);
 
 				// 2. Triangle
 				Triangle *tri2 = new Triangle(
@@ -319,6 +330,9 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 					m_uvs[offset + i + resolution + 1 + 1],
 					m_uvs[offset + i + resolution + 1]);
 				tri2->setMaterial(mat.get());
+				tri2->setU(m_u);
+				tri2->setV(m_v);
+				tri2->setW(m_w);
 
 				//Add triangles to return vector
 				triangles.push_back(tri1);

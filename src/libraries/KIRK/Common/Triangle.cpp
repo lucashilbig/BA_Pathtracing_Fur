@@ -111,16 +111,16 @@ KIRK::Triangle::Triangle(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 na, gl
         m_tcc = tca;
     }
 
-    m_u = m_B - m_A;
-    m_v = m_C - m_A;
-    m_uv = m_C - m_B;
+    m_ab = m_B - m_A;
+    m_ac = m_C - m_A;
+    m_bc = m_C - m_B;
 
-    if(m_u[m_lA] == 0.0f)
-        m_u[m_lA] = 0.0001f;
-    if(m_v[m_lA] == 0.0f)
-        m_v[m_lA] = 0.0001f;
-    if(m_uv[m_lA] == 0.0f)
-        m_uv[m_lA] = 0.0001f;
+    if(m_ab[m_lA] == 0.0f)
+        m_ab[m_lA] = 0.0001f;
+    if(m_ac[m_lA] == 0.0f)
+        m_ac[m_lA] = 0.0001f;
+    if(m_bc[m_lA] == 0.0f)
+        m_bc[m_lA] = 0.0001f;
 
     m_Normal = glm::normalize((m_na + m_nb + m_nc) / 3.0f);
 
@@ -153,8 +153,8 @@ bool KIRK::Triangle::closestIntersection(Intersection *hit, float tMin, float tM
 {
     glm::vec3 dir = hit->m_ray.m_direction;        // dir has length 1
 
-    glm::vec3 d_v = glm::cross(dir, m_v);
-    float det = glm::dot(d_v, m_u);
+    glm::vec3 d_v = glm::cross(dir, m_ac);
+    float det = glm::dot(d_v, m_ab);
     if(glm::abs(det) < cTriangleEpsilon)
         return false;
 
@@ -167,13 +167,13 @@ bool KIRK::Triangle::closestIntersection(Intersection *hit, float tMin, float tM
     if(u < 0.f || u > 1.f)
         return false;
 
-    glm::vec3 w_u = glm::cross(w, m_u);
+    glm::vec3 w_u = glm::cross(w, m_ab);
 
     float v = glm::dot(w_u, dir) * invDet;
     if(v < 0.f || u + v > 1.f)
         return false;
 
-    float t = glm::dot(w_u, m_v) * invDet;
+    float t = glm::dot(w_u, m_ac) * invDet;
     if((t < tMin) || (t > tMax))
         return false;
 
@@ -187,8 +187,8 @@ bool KIRK::Triangle::closestIntersectionAsPlane(Intersection *hit, float tMin, f
 {
     glm::vec3 dir = hit->m_ray.m_direction;        // dir has length 1
 
-    glm::vec3 d_v = glm::cross(dir, m_v);
-    float det = glm::dot(d_v, m_u);
+    glm::vec3 d_v = glm::cross(dir, m_ac);
+    float det = glm::dot(d_v, m_ab);
     if(glm::abs(det) < cTriangleEpsilon)
         return false;
 
@@ -198,9 +198,9 @@ bool KIRK::Triangle::closestIntersectionAsPlane(Intersection *hit, float tMin, f
     glm::vec3 w = P - m_A;
 
     float u = glm::dot(d_v, w) * invDet;
-    glm::vec3 w_u = glm::cross(w, m_u);
+    glm::vec3 w_u = glm::cross(w, m_ab);
     float v = glm::dot(w_u, dir) * invDet;
-    float t = glm::dot(w_u, m_v) * invDet;
+    float t = glm::dot(w_u, m_ac) * invDet;
     if((t < tMin) || (t > tMax))
         return false;
 
@@ -214,8 +214,8 @@ bool KIRK::Triangle::isIntersection(Ray *ray, float tMax)
 {
     glm::vec3 dir = ray->m_direction;
 
-    glm::vec3 d_v = glm::cross(dir, m_v);
-    float det = glm::dot(d_v, m_u);
+    glm::vec3 d_v = glm::cross(dir, m_ac);
+    float det = glm::dot(d_v, m_ab);
     if(glm::abs(det) < cTriangleEpsilon)
         return false;
 
@@ -228,13 +228,13 @@ bool KIRK::Triangle::isIntersection(Ray *ray, float tMax)
     if(u < 0.f || u > 1.f)
         return false;
 
-    glm::vec3 w_u = glm::cross(w, m_u);
+    glm::vec3 w_u = glm::cross(w, m_ab);
 
     float v = glm::dot(w_u, dir) * invDet;
     if(v < 0.f || u + v > 1.f)
         return false;
 
-    float t = glm::dot(w_u, m_v) * invDet;
+    float t = glm::dot(w_u, m_ac) * invDet;
     if((t < 0.f) || (t > tMax))
         return false;
 
@@ -256,8 +256,8 @@ void KIRK::Triangle::calcTcoord(Intersection *hit)
 void KIRK::Triangle::computeBounds()
 {
     glm::vec3 Vertex[2];
-    Vertex[0] = m_A + m_u;
-    Vertex[1] = m_A + m_v;
+    Vertex[0] = m_A + m_ab;
+    Vertex[1] = m_A + m_ac;
 
     m_bound[0] = m_A;
     m_bound[1] = m_A;
@@ -309,9 +309,9 @@ bool KIRK::Triangle::isInAABB(glm::vec3 *bbox)
     glm::vec3 mid = bbox[0] + diff * 0.5f;
     glm::vec3 v[3] = {(m_A - mid), (m_B - mid), (m_C - mid)};
 
-    glm::vec3 e0 = m_u;
-    glm::vec3 e1 = m_uv;
-    glm::vec3 e2 = -m_v;
+    glm::vec3 e0 = m_ab;
+    glm::vec3 e1 = m_bc;
+    glm::vec3 e2 = -m_ac;
 
     float min, max, p0, p2, rad;
 

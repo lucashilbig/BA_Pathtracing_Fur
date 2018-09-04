@@ -464,11 +464,14 @@ namespace KIRK {
 
 	glm::vec3 MarschnerHairBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 	{
-		//cast object to cylinder
-		KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
-		//if we have no cylinder as object we cant use marschner hair
-		if (cylinder_obj == NULL)
-			return glm::vec3(0.0f);
+		////cast object to cylinder
+		//KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
+		////if we have no cylinder as object we cant use marschner hair
+		//if (cylinder_obj == NULL)
+		//	return glm::vec3(0.0f);
+
+		//get our object
+		KIRK::Object *cylinder_obj = hit.m_object;
 
 		//needed parameters
 		Material* material = hit.m_object->getMaterial();
@@ -489,7 +492,7 @@ namespace KIRK {
 		if ((mat_flags & BSDFHelper::MATFLAG_CYLINDER_T_BOUNCE) && !(mat_flags & BSDFHelper::MATFLAG_CYLINDER_TR_BOUNCE))
 		{
 			//refract on the second wall of the cylinder to get output ray
-			local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), material->m_ior);
+			local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), 1.f);
 
 			//rotate towards normal to account for the tilted fiber surface
 			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(-alpha_r / 2, cylinder_obj->getV()));
@@ -513,7 +516,7 @@ namespace KIRK {
 			sample.x = theta_i; sample.y = 0;//We dont need sample, so we store the theta_i angle in it, because we need it in the MarschnerHairShader method
 
 			//M_tt(theta_h) -> gaussian function with zero-mean and our fibers material standart derivation.
-			output_pdf =  10.f * BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, beta_r / 2.f);
+			output_pdf =  BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, beta_r / 2.f);
 
 			//--------------------------------------------------------------------
 			// N_tt(phi) : Marschner conditional, azimuthal scattering function(N)
@@ -578,7 +581,7 @@ namespace KIRK {
 			else//We already have made the TR-Path. Now we have the final intersection for the TRT-Path
 			{
 				//refract on the first wall of the cylinder to get output ray
-				local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), material->m_ior);
+				local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), 1.f);
 
 				//rotate towards normal to account for the tilted fiber surface
 				local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(-3.f * alpha_r / 2.f, cylinder_obj->getV()));
@@ -603,7 +606,7 @@ namespace KIRK {
 				sample.x = theta_i; sample.y = 0;//We dont need sample, so we store the theta_i angle in it, because we need it in the MarschnerHairShader method
 
 				//M_trt(theta_h) -> gaussian function with zero-mean and our fibers material standart derivation.
-				output_pdf = 10.f * BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, 2.f * beta_r);
+				output_pdf =  BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, 2.f * beta_r);
 
 				//--------------------------------------------------------------------
 				// N_trt(phi) : Marschner conditional, azimuthal scattering function(N)
@@ -662,8 +665,8 @@ namespace KIRK {
 		{
 			//random value generator to select our Cylinder Path randomly. p = 0 is R-Path, p = 1 is TT-Path, p = 2 is TRT-Path			
 			std::uniform_int_distribution<int> dist(0, 2);
-			int p = dist(mt);
-			//int p = 1;
+			//int p = dist(mt);
+			int p = 0;
 
 			//We take Cylinder Path: R (surface reflection)
 			if (p == 0)
@@ -692,7 +695,7 @@ namespace KIRK {
 				sample.x = theta_i; sample.y = 0;//We dont need sample, so we store the theta_i angle in it, because we need it in the MarschnerHairShader method
 
 				//M_r(theta_h) -> gaussian function with zero-mean and our fibers material standart derivation. TODO: Try Logistic function as suggested in pixar paper
-				output_pdf = 10.f * BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, beta_r);
+				output_pdf =  BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, beta_r);
 
 				//--------------------------------------------------------------------
 				// N_r(phi) : Marschner conditional, azimuthal scattering function(N)
@@ -780,11 +783,14 @@ namespace KIRK {
 
 	glm::vec3 DEonHairBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 	{
-		//cast object to cylinder
-		KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
-		//if we have no cylinder as object we cant use marschner hair
-		if (cylinder_obj == NULL)
-			return glm::vec3(0.0f);
+		////cast object to cylinder
+		//KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
+		////if we have no cylinder as object we cant use marschner hair
+		//if (cylinder_obj == NULL)
+		//	return glm::vec3(0.0f);
+
+		//get our object
+		KIRK::Object *cylinder_obj = hit.m_object;
 
 		//needed parameters
 		Material* material = hit.m_object->getMaterial();
@@ -805,7 +811,7 @@ namespace KIRK {
 		if ((mat_flags & BSDFHelper::MATFLAG_CYLINDER_T_BOUNCE) && !(mat_flags & BSDFHelper::MATFLAG_CYLINDER_TR_BOUNCE))
 		{
 			//refract on the second wall of the cylinder to get output ray
-			local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), material->m_ior);
+			local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), 1.f);
 
 			//rotate towards normal to account for the tilted fiber surface
 			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(-alpha_r / 2, cylinder_obj->getV()));
@@ -887,7 +893,7 @@ namespace KIRK {
 			else//We already have made the TR-Path. Now we have the final intersection for the TRT-Path
 			{
 				//refract on the first wall of the cylinder to get output ray
-				local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), material->m_ior);
+				local_output_ray = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), 1.f);
 
 				//rotate towards normal to account for the tilted fiber surface
 				local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(-3.f * alpha_r / 2.f, cylinder_obj->getV()));

@@ -24,9 +24,7 @@ namespace KIRK {
 		void calcTcoord(Intersection *hit) override;
 		void calcNormal(Intersection *hit) override;
 		bool isInAABB(glm::vec3 *bbox) override;
-		glm::vec3 getU() const { return m_u; }
-		glm::vec3 getV() const { return m_v; }
-		glm::vec3 getW() const { return m_w; }
+		
 		float getBaseRadius() const { return m_baseradius; }
 		float getApexRadius() const { return m_apexradius; }
 
@@ -38,7 +36,6 @@ namespace KIRK {
 		void computeBounds() override;//calculates Cylinders BoundingBox in WorldSpace
 		
 		glm::vec3 m_basepoint, m_apexpoint;//stored in world space
-		glm::vec3 m_u, m_v, m_w;//The cones local space u,v,w axis
 		float m_baseradius, m_apexradius, m_height;
 		float m_slope, m_base_d, m_min_d, m_max_d;//cylinders slope and bottom and top caps
 	};
