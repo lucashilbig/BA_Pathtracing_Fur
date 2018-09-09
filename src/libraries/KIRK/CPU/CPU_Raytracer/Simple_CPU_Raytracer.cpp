@@ -9,7 +9,8 @@ KIRK::CPU::SimpleCPURaytracer::SimpleCPURaytracer() : KIRK::GuiElement()
 	m_adaptive_depth = 2;
 	m_max_adaptive_difference = 0.5f;
 
-	m_num_threads = KIRK::ThreadManager::maxThreads(); //Maximum thread count
+
+	m_num_threads = 1;//KIRK::ThreadManager::maxThreads(); //Maximum thread count
 };
 
 KIRK::CPU::SimpleCPURaytracer::SimpleCPURaytracer(std::shared_ptr<KIRK::CPU::Scene> cpuscene, int depth) : SimpleCPURaytracer()
@@ -66,7 +67,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::trace(Ray &ray, int level, floa
 		//if we have marschnerHairBSDF we use the specific shade method
 		if (hit.m_object->getMaterial()->m_current_bsdf == 6)
 			return shadeMarschnerHair(hit, level, weight);
-		else if(hit.m_object->getMaterial()->m_current_bsdf == 10)//TODO remove after intersection test
+		else if (hit.m_object->getMaterial()->m_current_bsdf == 10)//TODO remove after intersection test
 			return shadeIntersectionTest(hit);
 		else//we use standart shade method
 			return shade(hit, level, weight);
@@ -81,15 +82,15 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::lightShading(const glm::vec3 &p
 {
 	KIRK::Color::RGBA color = KIRK::Color::RGBA(0.0f);
 
-    // 2# ambient part of the illumination -> "global illumination"
-    KIRK::Color::RGBA ambient_color(0.0f);
+	// 2# ambient part of the illumination -> "global illumination"
+	KIRK::Color::RGBA ambient_color(0.0f);
 	ambient_color += m_cpuscene->getEnvironment().getAmbientLight()  * diff_color;
 
-    // The following value is kind of a cheaty way to remove one if-clause.
-    // if useSoftShadows is true, m_lightsamples will stay unchanged
-    // otherwise, it will be clamped to 1 sample, because we don't need more.
-    float clamped_samples = (m_num_lightsamples-1)*isEnabled(RTFLAG_USE_SOFT_SHADOWS)+1;
-    float light_count = m_cpuscene->getLights().size();
+	// The following value is kind of a cheaty way to remove one if-clause.
+	// if useSoftShadows is true, m_lightsamples will stay unchanged
+	// otherwise, it will be clamped to 1 sample, because we don't need more.
+	float clamped_samples = (m_num_lightsamples - 1)*isEnabled(RTFLAG_USE_SOFT_SHADOWS) + 1;
+	float light_count = m_cpuscene->getLights().size();
 
 	// recompute normal to consider both sides of polygons correctly in lighting
 	float m_dot = (glm::dot(norm, view));
@@ -134,7 +135,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::lightShading(const glm::vec3 &p
 		if (isEnabled(RTFLAG_USE_SOFT_SHADOWS))
 		{
 
-			Ray ambient_occlusion_test(pos + norm_view*1e-3f, norm_view);
+			Ray ambient_occlusion_test(pos + norm_view * 1e-3f, norm_view);
 			ambient_occlusion_test.jitterBy(3);
 
 			// shadow test
@@ -162,9 +163,9 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::lightShading(const glm::vec3 &p
 			if (glm::dot(norm_view, glm::normalize(lightToHit.m_direction)) < 0 || m_cpuscene->getDataStructure().isIntersection(&lightToHit, 1.0f))
 			{
 				shadowWeight[i]++;
-            }
-        }
-    }
+			}
+		}
+	}
 	// calculate final ambient lighting after AO
 	float ambient_fac = static_cast<float>(ambientShadowWeight) / clamped_samples;
 	color += (1 - ambient_fac) * ambient_color;
@@ -199,7 +200,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::reflection(const glm::vec3 &pos
 
 	// create a ray with the calculated origin and direction
 	Ray reflect(origin, specdir);
-    reflect.jitterBy(roughness);
+	reflect.jitterBy(roughness);
 	// trace it and add the color if we hit something
 	color = weight * trace(reflect, level + 1, falloff * weight);
 
@@ -222,7 +223,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::refraction(Intersection &hit, c
 		transdir = glm::normalize(transdir);
 		origin = pos + cRayEpsilon * transdir;
 		Ray refract(origin, transdir);
-	    refract.jitterBy(roughness);
+		refract.jitterBy(roughness);
 		color = weight * trace(refract, level + 1, falloff * weight);
 	}
 	else //we got total reflection
@@ -237,14 +238,14 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::depthOfField(int level, float w
 {
 	KIRK::Color::RGBA color(0.f);
 
-    // We can add separate DOF-samples to accelerate simple DOF applications
-    for(int di = 0; di < m_num_blursamples; di++)
-    {
-        //KIRK::Camera::PixelRay dof_ray = getCamera()->transformToDof(view);
-        Ray nray = m_cpuscene->getActiveCamera().transformToDof(view);
-        color += trace(nray, level + 1, weight) / (float)(m_num_blursamples);
-    }
-    return color;
+	// We can add separate DOF-samples to accelerate simple DOF applications
+	for (int di = 0; di < m_num_blursamples; di++)
+	{
+		//KIRK::Camera::PixelRay dof_ray = getCamera()->transformToDof(view);
+		Ray nray = m_cpuscene->getActiveCamera().transformToDof(view);
+		color += trace(nray, level + 1, weight) / (float)(m_num_blursamples);
+	}
+	return color;
 }
 
 KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::superSampling(int x, int y)
@@ -449,22 +450,22 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shade(Intersection &hit, int le
 
 KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection &hit, int level, float weight)
 {
-	
+
 	// get the objected we hit. static_cast cause we checked correct object type in render method already
 	//Cylinder *cylinder_obj = static_cast<KIRK::Cylinder*>(hit.m_object);
 	KIRK::Object *cylinder_obj = hit.m_object;
-	
+
 	// calculation of the normal
 	cylinder_obj->calcNormal(&hit);
 	cylinder_obj->calcTcoord(&hit);
-	
+
 	// get the position, normal, and direction of the intersection
 	glm::vec3 pos = hit.m_location;
 	glm::vec3 normal = hit.m_normal;
 	glm::vec2 texcoord = hit.m_texcoord;
 	Material* material = hit.m_object->getMaterial();
 	glm::vec3 norm_in_ray = glm::normalize(hit.m_ray.m_direction);//normalized input ray
-	
+
 	//calculation of tangent vector
 	glm::vec3 c1 = glm::cross(normal, glm::vec3(0.0, 0.0, 1.0));
 	glm::vec3 c2 = glm::cross(normal, glm::vec3(0.0, 1.0, 0.0));
@@ -488,7 +489,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	std::uniform_real_distribution<float> dist(5.0f, std::nextafter(10.0f, DBL_MAX));//std::nextafter so we get the [5,10] interval instead of [5,10)
 	float alpha_r = -1.0f * dist(mt);//longitudinal shift: R lobe. Suggested value from marschner hair paper between -10 and -5 degrees
 	float beta_r = dist(mt);//longitudinal width (stdev.): R lobe. Suggested value from marschner hair paper between 5 and 10 degrees		
-	
+
 	////////////////////////////////////////////////////////////////////
 	//  HOW THE FOLLOWING STEPS WORK:
 	//  1) We trace a Ray for every Cylinder-Path. R, TT and TRT
@@ -513,7 +514,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//--------------------------------------------------------------------
 
 		//calculate parameters for M
-		float sin_theta_r = glm::dot(glm::normalize(out_ray), tangent);		
+		float sin_theta_r = glm::dot(glm::normalize(out_ray), tangent);
 		float theta_r = glm::asin(sin_theta_r);//Angle between reflected output ray and fibers normal-plane	
 		float theta_h = (theta_r + theta_i) / 2;//theta half angle
 		float theta_d = (theta_r - theta_i) / 2;//theta difference angle
@@ -560,20 +561,20 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//Final value for the combined scattering function
 		scat_r = glm::vec3(m_r * n_r / glm::pow2(glm::cos(theta_d)));
 	}
-	
+
 	//////////////////////////////////////////
 	////
 	//// Cylinder Path: TT
 	////
 	//////////////////////////////////////////
-	{		
+	{
 		//refract input ray on surface and put it into new intersection
 		glm::vec3 t_dir = glm::refract(-norm_in_ray, glm::faceforward(normal, -norm_in_ray, normal), 1.0f / material->m_ior);
 		Intersection t_hit(Ray(pos + 1e-4f * t_dir, t_dir));
 		//get the intersection point on the second wall
 		if (m_cpuscene->getDataStructure().closestIntersection(&t_hit))
 			cylinder_obj->calcNormal(&t_hit);// calculation of the normal
-		
+
 		//refract on the second wall of the cylinder to get output ray
 		glm::vec3 out_ray = glm::refract(-glm::normalize(t_dir), glm::faceforward(t_hit.m_normal, -glm::normalize(t_dir), t_hit.m_normal), 1.f);
 
@@ -591,7 +592,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		float gaussian_x = theta_h - glm::radians((-alpha_r / 2.f));//longitudinal shift for TT-Path is smaller than for R-Path
 
 		//M_tt(theta_h) -> gaussian function with zero-mean and our fibers material standart derivation.
-		float m_tt =  BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, beta_r / 2.f);
+		float m_tt = BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, beta_r / 2.f);
 
 		//--------------------------------------------------------------------
 		// N_tt(phi) : Marschner conditional, azimuthal scattering function(N)
@@ -611,7 +612,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		float a = 1 / material->m_ior;
 		float nenner = glm::sqrt(1 + glm::pow2(a) - 2 * a * glm::sign(phi) * glm::sin(phi / 2.f));
 		float h = (glm::sign(phi) * glm::cos(phi / 2.f)) / nenner;
-		float gamma_i = glm::asin(h);		
+		float gamma_i = glm::asin(h);
 
 		//Bravais (virtual index of reflection eta_one, eta_two) calculation
 		float cos_gamma_i = glm::cos(gamma_i);
@@ -644,7 +645,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//add tt-path value to final scattering function value
 		scat_tt = (m_tt * n_tt / glm::pow2(glm::cos(theta_d)));
 	}
-	
+
 	//////////////////////////////////////////
 	////
 	//// Cylinder Path: TRT
@@ -656,7 +657,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//New Intersection for T path
 		Intersection t_hit(Ray(pos + 1e-4f * t_dir, t_dir));
 		//get the intersection point on the second wall
-		if(m_cpuscene->getDataStructure().closestIntersection(&t_hit))
+		if (m_cpuscene->getDataStructure().closestIntersection(&t_hit))
 			cylinder_obj->calcNormal(&t_hit);// calculation of the normal
 
 		//Reflect on the second cylinder wall 
@@ -664,7 +665,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//New Intersection for TR path
 		Intersection tr_hit(Ray(t_hit.m_location + 1e-4f * tr_dir, tr_dir));
 		//get the intersection for the second point on the first wall
-		if(m_cpuscene->getDataStructure().closestIntersection(&tr_hit))
+		if (m_cpuscene->getDataStructure().closestIntersection(&tr_hit))
 			cylinder_obj->calcNormal(&tr_hit);// calculation of the normal
 
 		//finaly refract on the first wall of the cylinder to get output ray
@@ -755,42 +756,159 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 
 	KIRK::Color::RGBA color = lightShading(pos, normal, texcoord, norm_in_ray, material, KIRK::Color::RGBA(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)));
 	//return color;
-	return KIRK::Color::RGBA( specular );
+	return KIRK::Color::RGBA(specular);
 
 }
 
 KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeIntersectionTest(Intersection &hit)
 {
+	// get the objected we hit. static_cast cause we checked correct object type in render method already
+	Object *obj = static_cast<KIRK::Object*>(hit.m_object);
+	// calculation of the normal
+	obj->calcNormal(&hit);	
 
+	//push input ray to vector
+	m_in_rays.push_back(hit.m_ray);
+
+	//R-PATH Test
+	/*{
+		//create output vector
+		glm::vec3 out_ray = glm::reflect(hit.m_ray.m_direction, glm::faceforward(hit.m_normal, hit.m_ray.m_direction, hit.m_normal));//reflect input ray on the surface
+
+		//calculation of tangent vector
+		glm::vec3 c1 = glm::cross(hit.m_normal, glm::vec3(0.0, 0.0, 1.0));
+		glm::vec3 c2 = glm::cross(hit.m_normal, glm::vec3(0.0, 1.0, 0.0));
+		glm::vec3 tangent = (glm::length(c1) > glm::length(c2)) ? glm::normalize(c1) : glm::normalize(c2);
+		//Rotate towards normal to account for tilted fiber surface
+		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(-7.f), tangent));
+
+		//push reflected ray to output rays
+		m_out_rays.push_back(KIRK::Ray(hit.m_location + 1e-4f * out_ray, out_ray));
+		//push normal to vector 
+		m_normal_rays.push_back(KIRK::Ray(hit.m_location, hit.m_normal));
+	}*/
+
+	//TT-PATH Test
+	/*{
+		glm::vec3 t_dir = glm::refract(hit.m_ray.m_direction, glm::faceforward(hit.m_normal, hit.m_ray.m_direction, hit.m_normal), 1.0f / 1.55f);
+		glm::vec3 t_normal;
+		Ray t_ray(hit.m_location + 1e-4f * t_dir, t_dir);
+		Intersection t_hit(t_ray);
+		//get the intersection point on the second wall
+		if (m_cpuscene->getDataStructure().closestIntersection(&t_hit))
+		{
+			obj->calcNormal(&t_hit);// calculation of the normal
+			t_normal = t_hit.m_normal;
+		}
+		else
+		{
+			t_normal = -hit.m_normal;
+		}
+
+		//refract on the second wall of the cylinder to get output ray
+		glm::vec3 out_ray = glm::refract(glm::normalize(t_dir), glm::faceforward(t_normal, glm::normalize(t_dir), t_normal), 1.0f / 1.55f);
+
+		//rotate towards normal to account for the tilted fiber surface
+		glm::vec3 c3 = glm::cross(t_normal, glm::vec3(0.0, 0.0, 1.0));
+		glm::vec3 c4 = glm::cross(t_normal, glm::vec3(0.0, 1.0, 0.0));
+		glm::vec3 t_tangent = (glm::length(c3) > glm::length(c4)) ? glm::normalize(c3) : glm::normalize(c4);
+		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(-7.f), t_tangent));
+
+		//push first and second refraction ray
+		m_out_rays.push_back(t_ray);
+		m_out_rays.push_back(KIRK::Ray(t_hit.m_location + 1e-4f * out_ray, out_ray));
+
+		//push first and second intersection normal to vector 
+		m_normal_rays.push_back(KIRK::Ray(hit.m_location, hit.m_normal));
+		m_normal_rays.push_back(KIRK::Ray(t_hit.m_location, t_normal));
+	}*/
+
+	//TRT-PATH Test
+	{
+		//T-PART
+		glm::vec3 t_dir = glm::refract(hit.m_ray.m_direction, glm::faceforward(hit.m_normal, hit.m_ray.m_direction, hit.m_normal), 1.0f / 1.55f);
+		glm::vec3 t_normal;
+		Ray t_ray(hit.m_location + 1e-4f * t_dir, t_dir);
+		Intersection t_hit(t_ray);
+		//get the intersection point on the second wall
+		if (m_cpuscene->getDataStructure().closestIntersection(&t_hit))
+		{
+			obj->calcNormal(&t_hit);// calculation of the normal
+			t_normal = t_hit.m_normal;
+		}
+		else
+		{
+			t_normal = -hit.m_normal;
+		}
+
+		//TR-PART
+		//Reflect on the second cylinder wall 
+		glm::vec3 tr_dir = glm::reflect(glm::normalize(t_dir), faceforward(t_normal, glm::normalize(t_dir), t_normal));
+		glm::vec3 tr_normal;
+		Ray tr_ray(t_hit.m_location + 1e-4f * tr_dir, tr_dir);
+		Intersection tr_hit(tr_ray);
+		//get the intersection for the second point on the first wall
+		if (m_cpuscene->getDataStructure().closestIntersection(&tr_hit))
+		{
+			obj->calcNormal(&tr_hit);// calculation of the normal
+			tr_normal = tr_hit.m_normal;
+		}
+		else
+		{
+			tr_normal = hit.m_normal;
+		}
+		
+		//TRT-PART
+		//refract on the first wall of the cylinder again to get output ray
+		glm::vec3 out_ray = glm::refract(glm::normalize(tr_dir), glm::faceforward(tr_normal, glm::normalize(tr_dir), tr_normal), 1.0f / 1.55f);
+
+		//rotate towards normal to account for the tilted fiber surface
+		glm::vec3 c1 = glm::cross(tr_normal, glm::vec3(0.0, 0.0, 1.0));
+		glm::vec3 c2 = glm::cross(tr_normal, glm::vec3(0.0, 1.0, 0.0));
+		glm::vec3 trt_tangent = (glm::length(c1) > glm::length(c2)) ? glm::normalize(c1) : glm::normalize(c2);
+		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(-7.f), trt_tangent));
+
+		//push all 3 output path rays
+		m_out_rays.push_back(t_ray);
+		m_out_rays.push_back(tr_ray);
+		m_out_rays.push_back(KIRK::Ray(tr_hit.m_location + 1e-4f * out_ray, out_ray));
+
+		//push first and second intersection normal to vector 
+		m_normal_rays.push_back(KIRK::Ray(hit.m_location, hit.m_normal));
+		m_normal_rays.push_back(KIRK::Ray(t_hit.m_location, t_normal));
+		m_normal_rays.push_back(KIRK::Ray(tr_hit.m_location, tr_normal));
+	}
+
+	return KIRK::Color::RGBA(0.f, 1.f, 0.f, 1.f);
 }
 
 void KIRK::CPU::SimpleCPURaytracer::onGui()
 {
-		ImGui::Text("Tools:");
-		ImGui::CheckboxFlags("Progress bar", &m_flags, RTFLAG_USE_PROGRESSBAR);
-		ImGui::Spacing();
-		ImGui::Text("Performance:");
-		ImGui::SliderInt("Threads", &m_num_threads, 1, KIRK::ThreadManager::maxThreads());
-		ImGui::Separator();
-		ImGui::SliderInt("MaxDepth", &m_depth, 0, 20);
-		ImGui::Spacing();
-		ImGui::Text("Effects:");
-		ImGui::CheckboxFlags("SoftShadows", &m_flags, RTFLAG_USE_SOFT_SHADOWS);
-		ImGui::SliderInt("Light Samples", &m_num_lightsamples, 1, 256);
-		ImGui::Spacing();
-		ImGui::CheckboxFlags("Reflection", &m_flags, RTFLAG_USE_REFLECTIONS);
-		ImGui::CheckboxFlags("Refraction", &m_flags, RTFLAG_USE_REFRACTIONS);
-		ImGui::Separator();
-		ImGui::CheckboxFlags("Super-Sampling", &m_flags, RTFLAG_USE_SUPERSAMPLING);
-		ImGui::SliderInt("Samples", &m_num_supersamples, 2, 16);
-		ImGui::CheckboxFlags("Adaptive-Sampling", &m_flags, RTFLAG_USE_ADAPTIVE_SAMPLING);
-		ImGui::SliderInt("Adapt. Depth", &m_adaptive_depth, 1, 16);
-		ImGui::SliderFloat("Adapt. Thresh.", &m_max_adaptive_difference, 0.01f, 1.f, "%.2f");
-		ImGui::CheckboxFlags("Poisson Disk-Sampling", &m_flags, RTFLAG_USE_POISSONDISK_SAMPLING);
-		ImGui::SliderInt("Samples", &m_num_poissondisksamples, 2, 16);
-		ImGui::Separator();
-		ImGui::CheckboxFlags("Depth of Field", &m_flags, RTFLAG_USE_DOF);
-		ImGui::DragInt("DOF Samples", &m_num_blursamples, 1, 2, 500);
+	ImGui::Text("Tools:");
+	ImGui::CheckboxFlags("Progress bar", &m_flags, RTFLAG_USE_PROGRESSBAR);
+	ImGui::Spacing();
+	ImGui::Text("Performance:");
+	ImGui::SliderInt("Threads", &m_num_threads, 1, KIRK::ThreadManager::maxThreads());
+	ImGui::Separator();
+	ImGui::SliderInt("MaxDepth", &m_depth, 0, 20);
+	ImGui::Spacing();
+	ImGui::Text("Effects:");
+	ImGui::CheckboxFlags("SoftShadows", &m_flags, RTFLAG_USE_SOFT_SHADOWS);
+	ImGui::SliderInt("Light Samples", &m_num_lightsamples, 1, 256);
+	ImGui::Spacing();
+	ImGui::CheckboxFlags("Reflection", &m_flags, RTFLAG_USE_REFLECTIONS);
+	ImGui::CheckboxFlags("Refraction", &m_flags, RTFLAG_USE_REFRACTIONS);
+	ImGui::Separator();
+	ImGui::CheckboxFlags("Super-Sampling", &m_flags, RTFLAG_USE_SUPERSAMPLING);
+	ImGui::SliderInt("Samples", &m_num_supersamples, 2, 16);
+	ImGui::CheckboxFlags("Adaptive-Sampling", &m_flags, RTFLAG_USE_ADAPTIVE_SAMPLING);
+	ImGui::SliderInt("Adapt. Depth", &m_adaptive_depth, 1, 16);
+	ImGui::SliderFloat("Adapt. Thresh.", &m_max_adaptive_difference, 0.01f, 1.f, "%.2f");
+	ImGui::CheckboxFlags("Poisson Disk-Sampling", &m_flags, RTFLAG_USE_POISSONDISK_SAMPLING);
+	ImGui::SliderInt("Samples", &m_num_poissondisksamples, 2, 16);
+	ImGui::Separator();
+	ImGui::CheckboxFlags("Depth of Field", &m_flags, RTFLAG_USE_DOF);
+	ImGui::DragInt("DOF Samples", &m_num_blursamples, 1, 2, 500);
 
 	//    ImGui::Separator();
 	//    ImGui::Text("Experimental");

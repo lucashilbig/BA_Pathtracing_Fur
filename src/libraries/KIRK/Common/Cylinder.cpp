@@ -47,7 +47,7 @@ KIRK::Cylinder::Cylinder(glm::vec3 basePoint, glm::vec3 apexPoint, float baseRad
 	m_sizeIndicator = m_bound[1] - m_bound[0];
 
 	//calculate centroid, which is located at the middle of the cylinder axis(v-axis)
-	m_centroid = m_basepoint + (0.5 * m_v);
+	m_centroid = m_basepoint + (0.4 * (apexPoint - basePoint));
 
 	//calculate longest axis of the bounding box
 	glm::vec3 boundDiff = m_bound[1] - m_bound[0];
@@ -308,7 +308,7 @@ void KIRK::Cylinder::computeBounds()
 	glm::vec3 lbound[2];
 	glm::vec3 P[8];
 
-	float radius = (m_baseradius > m_apexradius) ? m_baseradius : m_apexradius;
+	float radius = (m_baseradius > m_apexradius) ? m_baseradius + 1e-6f : m_apexradius + 1e-6f;
 	lbound[0] = glm::vec3(-radius, 0, -radius);
 	lbound[1] = glm::vec3(radius, m_height, radius);
 	glm::mat3 cone_matrix = glm::mat3(m_u, m_v, m_w);

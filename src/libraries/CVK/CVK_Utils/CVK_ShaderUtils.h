@@ -29,7 +29,7 @@ class PhongToScreenShader
 {
 public:
     // shaderName f.e. "/Phong/Phong"
-    PhongToScreenShader(std::shared_ptr<CVK::Node> scene = 0, std::string shaderName = "/Phong/Phong");
+    PhongToScreenShader(std::shared_ptr<CVK::Node> scene = 0, std::string shaderName = "/VoxelVis/LineVis");//TODO Change back to Phong/Phong after intersection tests
 
     virtual ~PhongToScreenShader() {}
 

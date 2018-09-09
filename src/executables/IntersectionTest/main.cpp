@@ -1,5 +1,6 @@
 #include "CVK/CVK_Utils/CVK_ShaderUtils.h"
 #include "CVK/CVK_Utils/CVK_ConverterUtils.h"
+#include "CVK/CVK_2/CVK_LineList.h"
 
 #include "KIRK/Common/SceneGraph.h"
 
@@ -45,6 +46,16 @@ std::shared_ptr<KIRK::Texture> render_texture_cpu;
 
 //wrapper for the camera
 CVK::CVKCameraSynchronizer *camera_wrapper;
+
+//Intersection Rays for debugging
+std::vector<KIRK::Ray> in_rays;
+std::vector<KIRK::Ray> normal_rays;
+std::vector<KIRK::Ray> out_rays;
+int m_ray_index = 0;//Index of the current rays
+int m_out_ray_index = 0;//Index of the current output rays since we have 2(TT-Path) or 3(TRT-Path) for one inpute ray
+
+//phong shader
+std::shared_ptr<CVK::ShaderUtils::PhongToScreenShader> phong_shader;
 
 //////////////////////////////////////////////
 //
@@ -173,10 +184,61 @@ void charCallback(GLFWwindow *window, unsigned int key)
 	case '1'://switch to CPU mode
 		m_platform_used = 1;
 		break;
+	case '+'://View next intersection point
+		m_ray_index++;
+		m_out_ray_index += 3;
+		if (in_rays.size() > 0 && in_rays.size() > m_ray_index - 1) {
+			//create parent node
+			std::shared_ptr<CVK::Node> parent = std::make_shared<CVK::Node>("Parent_Node");;
+
+			//create CVK::LineList for Input/Normal/Output rays
+			std::shared_ptr<CVK::LineList> in_lines = std::make_shared<CVK::LineList>();
+			std::shared_ptr<CVK::LineList> normal_lines = std::make_shared<CVK::LineList>();
+			std::shared_ptr<CVK::LineList> out_lines = std::make_shared<CVK::LineList>();
+			in_lines->init_LineList();
+			normal_lines->init_LineList();
+			out_lines->init_LineList();
+
+			//Input Rays in Green
+			in_lines->add_Line(in_rays[m_ray_index].m_origin, in_rays[m_ray_index].followDistance(glm::length(in_rays[m_ray_index].m_origin - normal_rays[m_out_ray_index].m_origin)), glm::vec3(0.f, 1.f, 0.f));
+			//Normal Rays in Blue, Light Blue, White
+			normal_lines->add_Line(normal_rays[m_out_ray_index].m_origin, normal_rays[m_out_ray_index].followDistance(0.3f), glm::vec3(0.f, 0.f, 1.f));
+			normal_lines->add_Line(normal_rays[m_out_ray_index + 1].m_origin, normal_rays[m_out_ray_index + 1].followDistance(0.3f), glm::vec3(0.f, 1.f, 1.f));
+			normal_lines->add_Line(normal_rays[m_out_ray_index + 2].m_origin, normal_rays[m_out_ray_index + 2].followDistance(0.3f), glm::vec3(1.f, 1.f, 1.f));
+			//Output Rays in RED. First Refraction ray RED, second ray in YELLOW, third ray in ORANGE
+			out_lines->add_Line(out_rays[m_out_ray_index].m_origin, out_rays[m_out_ray_index].followDistance(glm::length(out_rays[m_out_ray_index].m_origin - out_rays[m_out_ray_index + 1].m_origin)), glm::vec3(1.f, 0.f, 0.f));
+			out_lines->add_Line(out_rays[m_out_ray_index + 1].m_origin, out_rays[m_out_ray_index + 1].followDistance(glm::length(out_rays[m_out_ray_index+1].m_origin - out_rays[m_out_ray_index + 2].m_origin)), glm::vec3(1.f, 1.f, 0.f));
+			out_lines->add_Line(out_rays[m_out_ray_index + 2].m_origin, out_rays[m_out_ray_index + 2].followDistance(2), glm::vec3(1.f, 0.65f, 0.f));
+
+			//finish LineLists
+			in_lines->finish_LineList();
+			normal_lines->finish_LineList();
+			out_lines->finish_LineList();
+			//add LineLists to Nodes
+			std::shared_ptr<CVK::Node> in_node = std::make_shared<CVK::Node>("Input_Rays_Node");
+			in_node->setGeometry(in_lines);
+			in_node->setModelMatrix(glm::mat4(1.f));
+			std::shared_ptr<CVK::Node> normal_node = std::make_shared<CVK::Node>("Normal_Rays_Node");
+			normal_node->setGeometry(normal_lines);
+			normal_node->setModelMatrix(glm::mat4(1.f));
+			std::shared_ptr<CVK::Node> out_node = std::make_shared<CVK::Node>("Ouput_Rays_Node");
+			out_node->setGeometry(out_lines);
+			out_node->setModelMatrix(glm::mat4(1.f));
+
+			//add nodes to parent
+			parent->addChild(in_node);
+			parent->addChild(normal_node);
+			parent->addChild(out_node);
+			
+			//assign new scene to phong shader
+			phong_shader->setRenderScene(parent);
+		}
+		break;
 	default:
 		break;
 	}
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -237,7 +299,7 @@ int main(int argc, char *argv[])
 
 	//We use the screenFillShader to draw our texture to a screen filling quad.
 	auto screen_shader = CVK::ShaderUtils::ScreenFillShader();
-	auto phong_shader = std::make_shared<CVK::ShaderUtils::PhongToScreenShader>(CVK::SceneToCVK::exportScene(scene, true));
+	phong_shader = std::make_shared<CVK::ShaderUtils::PhongToScreenShader>(CVK::SceneToCVK::exportScene(scene, true));
 
 	//////////////////////////////////////////////
 	//
@@ -251,19 +313,51 @@ int main(int argc, char *argv[])
 	cpu_scene->m_materials.clear();
 	cpu_scene->m_scene_objects.clear();
 
-	//create cylinder object at coordinate origin
-	KIRK::Cylinder *obj = new KIRK::Cylinder(glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f), 0.2f, 0.2f, &glm::mat4(1.f));
-	
+	//create object as cylinder or triangle
+	bool useCylinder = true;
+	KIRK::Cylinder *obj;
 
-	//Material for fur fibers with marschnerHairBSDF and -Shader
-	std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Cylinder_Mat");
-	mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color 0.545f, 0.353f, 0.169f
-	mat->m_ior = 1.55f;//suggested value from marschner hair paper
-	mat->m_current_bsdf = 10;//Intersection Test shade function
-	cpu_scene->m_materials.push_back(mat);
-	obj->setMaterial(mat.get());
-	//add object to scene
-	cpu_scene->m_scene_objects.push_back(obj);
+	if (useCylinder) {
+		//create cylinder object at coordinate origin radius -= (radius / ((float)i + 5));
+		float radius = 0.004f;
+		obj = new KIRK::Cylinder(glm::vec3(0.f), glm::vec3(0.f, 1.f, 0.f), radius, radius - (radius / 6.f), &glm::mat4(1.f));
+		//Material for fur fibers with marschnerHairBSDF and -Shader
+		std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Cylinder_Mat");
+		mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color 0.545f, 0.353f, 0.169f
+		mat->m_ior = 1.55f;//suggested value from marschner hair paper
+		mat->m_current_bsdf = 10;//Intersection Test shade function
+		cpu_scene->m_materials.push_back(mat);
+		obj->setMaterial(mat.get());
+		//add object to scene
+		cpu_scene->m_scene_objects.push_back(obj);
+	}
+	else {//use triangles
+		//create fur fiber at position 0,0,0 with height 1
+		KIRK::Mesh::furFiber fiber;
+		fiber.fiber_positions.push_back(glm::vec3(0));
+		fiber.fiber_positions.push_back(glm::vec3(0, 1, 0));
+		fiber.fiber_radius.push_back(0.2f);
+		fiber.fiber_radius.push_back(0.2f);
+		//create triangles from the current fur fiber
+		std::vector<KIRK::Triangle *> triangles = std::move(cpu_scene->fiberToTriangles(fiber, glm::mat4(1.f), 5));
+		//Material for fur fibers with marschnerHairBSDF and -Shader
+		std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Cylinder_Mat");
+		mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color 0.545f, 0.353f, 0.169f
+		mat->m_ior = 1.55f;//suggested value from marschner hair paper
+		mat->m_current_bsdf = 10;//Intersection Test shade function
+		cpu_scene->m_materials.clear();
+		cpu_scene->m_materials.push_back(mat);
+		//push triangles to m_scene_objects
+		for (int t = 0; t < triangles.size(); t++)
+		{
+			triangles[t]->setMaterial(mat.get());
+			cpu_scene->m_scene_objects.push_back(triangles[t]);
+		}
+	}
+
+
+
+	cpu_scene->setDataStructure(std::unique_ptr<KIRK::CPU::CPU_DataStructure>(std::make_unique<KIRK::CPU::BVH>()));
 	cpu_scene->updateFromSceneGraph(true);
 
 
@@ -279,7 +373,7 @@ int main(int argc, char *argv[])
 	cpu_pathtracer->setDepth(5);
 
 	//set default raytracer
-	m_active_cpu_raytracer = cpu_pathtracer;
+	m_active_cpu_raytracer = cpu_raytracer;
 
 	//////////////////////////////////////////////
 	//
@@ -290,142 +384,7 @@ int main(int argc, char *argv[])
 	//Initialize ImGUI
 	auto gui = std::make_shared<KIRK::Gui>(*window);
 
-	KIRK::GuiScene gui_scene(gui);
-	gui_scene.setUpdateCallback([&](unsigned flags)
-	{
-		cpu_scene->updateFromSceneGraph(true);
-		phong_shader->setRenderScene(CVK::SceneToCVK::exportScene(scene));
-	});
-	gui_scene.buildSceneGui(scene, *camera_wrapper);
-
-
-	auto loadFile = [&](fs::path path)
-	{
-		LOG_INFO("Scene importing from %", path);
-		scene = KIRK::SceneGraph::makeSceneGraph(path.string());//Memory usage verringert sich beim Aufruf dieser Zeile warum auch immer.
-
-																//cpu scene and raytracer
-		cpu_scene->setSceneGraph(scene);
-		cpu_scene->updateFromSceneGraph(true);
-		cpu_raytracer->init(cpu_scene);
-		cpu_pathtracer->init(cpu_scene);
-		//openGL stuff
-		phong_shader->setRenderScene(CVK::SceneToCVK::exportScene(scene));
-		screen_shader = CVK::ShaderUtils::ScreenFillShader();
-		camera_wrapper->setCVKCamera(scene, std::shared_ptr<CVK::Camera>(getFreeFlightCamera(image_width, image_height)));
-		gui_scene.setUpdateCallback([&](unsigned flags)
-		{
-			cpu_scene->updateFromSceneGraph(true);
-			phong_shader->setRenderScene(CVK::SceneToCVK::exportScene(scene));
-		});
-		gui_scene.buildSceneGui(scene, *camera_wrapper);
-	};
-
-
-	//gui raytracer selection
-	gui->make<KIRK::GuiWindow>("Render Mode", true)->make<KIRK::GuiNamedLambdaElement>("modes", [&]()
-	{
-		//------------ Raytracer Selection -----------------
-
-		static int cpu_ds_id = 1;
-		static int raytracer = 1;
-
-		//select rendering platform
-		ImGui::RadioButton("OpenGL", &m_platform_used, 0); ImGui::SameLine();
-		ImGui::RadioButton("CPU", &m_platform_used, 1);
-
-		//select Raytracer usage
-		if (m_platform_used == 1)
-		{
-			ImGui::RadioButton("Raytracer", &raytracer, 0); ImGui::SameLine();
-			ImGui::RadioButton("Pathtracer", &raytracer, 1);
-			//if the raytracer is active change the button color to green
-			bool pop_color = false;
-			if (m_is_raytracer_active)
-			{
-				ImGui::PushStyleColor(ImGuiCol_Button, ImColor::HSV(0.3f, 0.6f, 0.6f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImColor::HSV(0.3f, 0.7f, 0.7f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImColor::HSV(0.3f, 0.8f, 0.8f));
-				pop_color = true;
-			}
-			if (ImGui::Button("Render Image", ImVec2(250.0f, 32.0f)))
-			{
-				LOG_INFO("\n       Rendering new Image \n       -------------------");
-				cpu_pathtracer->reset();
-				m_is_raytracer_active = true;
-			}
-			if (pop_color) { ImGui::PopStyleColor(3); pop_color = false; }
-			ImGui::SameLine();
-			ImGui::PushStyleColor(ImGuiCol_Button, ImColor::HSV(0.0f, 0.6f, 0.6f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImColor::HSV(0.0f, 0.7f, 0.7f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImColor::HSV(0.0f, 0.8f, 0.8f));
-			if (ImGui::Button("Stop Rendering", ImVec2(ImGui::GetContentRegionAvailWidth(), 32.0f)))
-			{
-				m_is_raytracer_active = false;
-				LOG_INFO("Stopped Rendering");
-			}
-			ImGui::PopStyleColor(3);
-			ImGui::Separator();
-		}
-
-
-		if (m_platform_used == 1) // CPU is used
-		{
-			//select cpu datastructure
-			const char* cpu_datastructures[] = { "No Datastructure", "Bounding Volume Hierarchy", "KD Tree" };
-			if (ImGui::Combo("Datastructure", &cpu_ds_id, cpu_datastructures, static_cast<int>(sizeof(cpu_datastructures) / sizeof(*cpu_datastructures)))) { setDatastructure(cpu_ds_id); }
-			ImGui::Separator();
-			ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "Settings");
-
-			switch (raytracer)
-			{
-			case 0://simple Raytracer
-				cpu_raytracer->draw();
-				setActiveCPURaytracer(cpu_raytracer);
-				m_show_render_texture = true;
-				break;
-			case 1:// Pathtracer
-				cpu_pathtracer->draw();
-				setActiveCPURaytracer(cpu_pathtracer);
-				m_show_render_texture = true;
-				break;
-			default: // default is pathtracer
-				cpu_pathtracer->draw();
-				setActiveCPURaytracer(cpu_pathtracer);
-				m_show_render_texture = true;
-				break;
-			}
-		}
-		else // OpenGL is used
-		{
-			m_is_raytracer_active = false;
-			m_show_render_texture = false;
-		}
-	});
-
 	auto menu_bar = gui->make<KIRK::GuiMainMenuBar>();
-	menu_bar->addItem("File", "Export", [&]()
-	{
-		gui->make<KIRK::GuiFileDialog>("Export to...", "Export", "Cancel", SCENES_PATH, false, [&](const KIRK::GuiFileDialog &dialog, const fs::path &path)
-		{
-			LOG_INFO("Scene exporting to %", path);
-			jsonio::writeScene(scene, path.string());
-		});
-	});
-	menu_bar->addItem("File", "Import", [&]()
-	{
-		gui->make<KIRK::GuiFileDialog>("Import from...", "Import", "Cancel", SCENES_PATH, true, [&](const KIRK::GuiFileDialog &dialog, const fs::path &path)
-		{
-			loadFile(path);
-		});
-	});
-	menu_bar->addSeparator("File");
-	menu_bar->addItem("File", "Save Render", saveRenderTexture);
-	menu_bar->addSeparator("File");
-	menu_bar->addItem("File", "Exit", [&]()
-	{
-		window->close();
-	});
 
 	menu_bar->addItem("Camera", "Trackball", [&]()
 	{
@@ -437,18 +396,104 @@ int main(int argc, char *argv[])
 		camera_wrapper->setCVKCamera(scene, std::shared_ptr<CVK::Camera>(getFreeFlightCamera(image_width, image_height)));
 	});
 
-	menu_bar->enableViewMenu("View");
-
-	auto fileDropCallback = [&](GLFWwindow *window, int count, const char ** files)
-	{
-		fs::path path(files[0]);
-		loadFile(path);
-	};
 
 	//Setting our callbacks
 	KIRK::Callbacks::addCharCallback(charCallback);
-	KIRK::Callbacks::addFileDropCallback(fileDropCallback);
 	glfwSetWindowSizeCallback(window->getGLFWWindow(), resizeCallback);
+
+	//////////////////////////////////////////////
+	//
+	//  Create CVK Scene with intersection Rays
+	//
+	//////////////////////////////////////////////
+
+	//Render with the raytracer to our texture. This will store intersection rays to m_intersec_rays in the cpu_raytracer
+	cpu_raytracer->renderToTexture(render_texture_cpu);
+
+	//get rays from raytracer
+	in_rays = cpu_raytracer->getInRays();
+	normal_rays = cpu_raytracer->getNormalRays();
+	out_rays = cpu_raytracer->getOutRays();
+
+	//Display rays with openGL
+	if (in_rays.size() > 0) {
+		//create parent node
+		std::shared_ptr<CVK::Node> parent = std::make_shared<CVK::Node>("Parent_Node");;
+
+		//create CVK::LineList for Input/Normal/Output rays
+		std::shared_ptr<CVK::LineList> in_lines = std::make_shared<CVK::LineList>();
+		std::shared_ptr<CVK::LineList> normal_lines = std::make_shared<CVK::LineList>();
+		std::shared_ptr<CVK::LineList> out_lines = std::make_shared<CVK::LineList>();
+		in_lines->init_LineList();
+		normal_lines->init_LineList();
+		out_lines->init_LineList();
+
+		//Input Rays in GREEN
+		in_lines->add_Line(in_rays[m_ray_index].m_origin, in_rays[m_ray_index].followDistance(glm::length(in_rays[m_ray_index].m_origin - normal_rays[m_out_ray_index].m_origin)), glm::vec3(0.f, 1.f, 0.f));
+		//Normal Rays in BLUE
+		for(int i = 0; i < normal_rays.size(); i+=2)
+			normal_lines->add_Line(normal_rays[i].m_origin, normal_rays[i].followDistance(0.3f), glm::vec3(0.f, 0.f, 1.f));
+
+		//Normal Rays in Blue, Light Blue, White
+		//normal_lines->add_Line(normal_rays[m_out_ray_index].m_origin, normal_rays[m_out_ray_index].followDistance(0.3f), glm::vec3(0.f, 0.f, 1.f));
+		normal_lines->add_Line(normal_rays[m_out_ray_index + 1].m_origin, normal_rays[m_out_ray_index + 1].followDistance(0.3f), glm::vec3(0.f, 1.f, 1.f));
+		normal_lines->add_Line(normal_rays[m_out_ray_index + 2].m_origin, normal_rays[m_out_ray_index + 2].followDistance(0.3f), glm::vec3(1.f, 1.f, 1.f));
+		//Output Rays in RED. First Refraction ray RED, second ray in YELLOW, third ray in ORANGE
+		out_lines->add_Line(out_rays[m_out_ray_index].m_origin, out_rays[m_out_ray_index].followDistance(glm::length(out_rays[m_out_ray_index].m_origin - out_rays[m_out_ray_index + 1].m_origin)), glm::vec3(1.f, 0.f, 0.f));
+		out_lines->add_Line(out_rays[m_out_ray_index + 1].m_origin, out_rays[m_out_ray_index + 1].followDistance(glm::length(out_rays[m_out_ray_index + 1].m_origin - out_rays[m_out_ray_index + 2].m_origin)), glm::vec3(1.f, 1.f, 0.f));
+		out_lines->add_Line(out_rays[m_out_ray_index + 2].m_origin, out_rays[m_out_ray_index + 2].followDistance(2), glm::vec3(1.f, 0.65f, 0.f));
+		
+		//finish LineLists
+		in_lines->finish_LineList();
+		normal_lines->finish_LineList();
+		out_lines->finish_LineList();
+		//add LineLists to Nodes
+		std::shared_ptr<CVK::Node> in_node = std::make_shared<CVK::Node>("Input_Rays_Node");
+		in_node->setGeometry(in_lines);
+		in_node->setModelMatrix(glm::mat4(1.f));
+		std::shared_ptr<CVK::Node> normal_node = std::make_shared<CVK::Node>("Normal_Rays_Node");
+		normal_node->setGeometry(normal_lines);
+		normal_node->setModelMatrix(glm::mat4(1.f));
+		std::shared_ptr<CVK::Node> out_node = std::make_shared<CVK::Node>("Ouput_Rays_Node");
+		out_node->setGeometry(out_lines);
+		out_node->setModelMatrix(glm::mat4(1.f));
+
+		//add nodes to parent
+		parent->addChild(in_node);
+		parent->addChild(normal_node);
+		parent->addChild(out_node);
+		
+		//assign new scene to phong shader
+		phong_shader->setRenderScene(parent);
+	}
+
+	//Display Cylinder Axis
+	/*{
+		//create parent node
+		std::shared_ptr<CVK::Node> parent = std::make_shared<CVK::Node>("Parent_Node");;
+
+		//create CVK::LineList for Input/Normal/Output rays
+		std::shared_ptr<CVK::LineList> axis_lines = std::make_shared<CVK::LineList>();
+		axis_lines->init_LineList();
+
+		//Add Axis lines. U-axis RED, V-axis GREEN, W-axis BLUE
+		axis_lines->add_Line(obj->getU(), obj->getU() * -2, glm::vec3(1.f, 0.f, 0.f));
+		axis_lines->add_Line(obj->getV(), obj->getV() * -2, glm::vec3(0.f, 1.f, 0.f));
+		axis_lines->add_Line(obj->getW(), obj->getW() * -2, glm::vec3(0.f, 0.f, 1.f));	
+		
+		//finish LineLists
+		axis_lines->finish_LineList();
+		//add LineLists to Nodes
+		std::shared_ptr<CVK::Node> in_node = std::make_shared<CVK::Node>("Input_Rays_Node");
+		in_node->setGeometry(axis_lines);
+		in_node->setModelMatrix(glm::mat4(1.f));
+
+		//add nodes to parent
+		parent->addChild(in_node);
+
+		//assign new scene to phong shader
+		phong_shader->setRenderScene(parent);
+	}*/
 
 	//////////////////////////////////////////////
 	//
@@ -461,41 +506,10 @@ int main(int argc, char *argv[])
 		if (!gui->wantsMouseInput() && !m_is_raytracer_active && !m_show_render_texture)
 			camera_wrapper->update(window->getGLFWWindow());
 
-		if (m_is_raytracer_active)
-		{
-			//render the image to the render texture
-			if (m_platform_used == 1)
-			{
-				//Render with the pathtracer to our texture
-				m_active_cpu_raytracer->renderToTexture(render_texture_cpu);
+		//Render scene with OpenGL
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		phong_shader->render();
 
-				// upload only for cpu tracer to display the data on the gpu
-				render_texture_cpu->glUpload();
-			}
-			//We don't want to keep rendering.
-			if (m_active_cpu_raytracer == cpu_raytracer && m_platform_used == 1)
-				m_is_raytracer_active = false;
-			//We want to see our image
-			m_show_render_texture = true;
-		}
-
-		if (m_show_render_texture)
-		{
-			//If we want to show our texture on screen or after rendering, we just render a screen filling quad.
-			if (m_platform_used == 1)//cpu mode is active
-			{
-				//fill the screen_shader with the cpu render texture
-				screen_shader.setRenderTexture(render_texture_cpu->id());
-			}
-			//render a screen filling quad
-			screen_shader.render();
-		}
-		else
-		{
-			//If we want to look around in CVK OpenGL mode, we render the scene in OpenGL.
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			phong_shader->render();
-		}
 		gui->render();
 		window->endFrame();
 	}

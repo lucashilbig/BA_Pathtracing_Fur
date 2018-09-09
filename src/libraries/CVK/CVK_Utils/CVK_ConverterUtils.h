@@ -55,6 +55,7 @@ namespace CVK
          */
 
         static std::shared_ptr<CVK::Node> exportScene(std::shared_ptr<KIRK::SceneGraph> sceneGraph, bool showLightGeometry = false);
+
     private:
         /**
          Converts the KIRK::SceneNode recursively to a vector of CVK::Node pointers. That is needed, as KIRK::SceneNodes

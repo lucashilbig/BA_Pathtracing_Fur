@@ -98,6 +98,7 @@ namespace CVK
 		return toCVKNode(sceneGraph->getRootNode(), showLightGeometry)[0];
 	}
 
+
 	std::vector<std::shared_ptr<CVK::Node>> CVK::SceneToCVK::toCVKNode(const std::shared_ptr<KIRK::SceneNode> sceneNode, bool showLightGeometry)
 	{
 		std::vector<std::shared_ptr<CVK::Node>> m_nodes;

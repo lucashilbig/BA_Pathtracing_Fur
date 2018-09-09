@@ -86,11 +86,19 @@ namespace KIRK
 
 			float m_max_adaptive_difference;	//!< Difference below which two colors are considered equal enough for adaptive sampling
 
-
+			//TODO remove after intersection test
+			std::vector<KIRK::Ray> getInRays() { return m_in_rays; }
+			std::vector<KIRK::Ray> getNormalRays() { return m_normal_rays; }
+			std::vector<KIRK::Ray> getOutRays() { return m_out_rays; }
 
 		protected:
 		private:
 			unsigned int m_flags = 0;
+
+			//TODO Remove after Intersetion test
+			std::vector<KIRK::Ray> m_in_rays;// all rays which will be tested for intersection. 1)Input-Ray 2)Intersec-Normal 3)Output-Ray
+			std::vector<KIRK::Ray> m_normal_rays;
+			std::vector<KIRK::Ray> m_out_rays;
 
 			/** render image
 			* ray traces the whole image, so loops over all pixels and traces each with a ray

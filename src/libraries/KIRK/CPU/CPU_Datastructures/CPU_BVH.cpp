@@ -13,7 +13,7 @@ const char *CPU::BVH::printName() const
     return "BVH";
 }
 
-    void CPU::BVH::addBaseDataStructure(KIRK::CPU::Scene *scene)
+void CPU::BVH::addBaseDataStructure(KIRK::CPU::Scene *scene)
 {
 	Clock<> clock;
     const std::vector<KIRK::Object *> objects = scene->getSceneObjects();
