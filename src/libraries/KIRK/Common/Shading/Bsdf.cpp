@@ -547,7 +547,7 @@ namespace KIRK {
 			if (fresnel == 1) fresnel = 0.f;//so it doesnt change att_color to 0
 
 			//helper variables for attenuation
-			float cos_gamma_t = -2.f * glm::cos(glm::asin(h / bravais_first));
+			float cos_gamma_t = 2.f * glm::cos(glm::asin(h / bravais_first));
 			glm::vec3 new_sigma = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);//new color absorption coefficient
 			//attenuation factor, which contains color absorbtion
 			glm::vec3 att_color = glm::pow2(1 - fresnel) * glm::exp(new_sigma * cos_gamma_t);
@@ -648,7 +648,7 @@ namespace KIRK {
 				//new color absorption coefficient
 				glm::vec3 new_sigma = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);
 				//full attenuation
-				glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(glm::exp(new_sigma * (-2.f * cos_gamma_t)));
+				glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(glm::exp(new_sigma * (2.f * cos_gamma_t)));
 
 				//final term for N_trt(phi)
 				glm::vec3 n_trt = 0.5f * att_color * dh_dphi;
@@ -664,7 +664,7 @@ namespace KIRK {
 			//random value generator to select our Cylinder Path randomly. p = 0 is R-Path, p = 1 is TT-Path, p = 2 is TRT-Path			
 			std::uniform_int_distribution<int> dist(0, 2);
 			//int p = dist(mt);
-			int p = 0;
+			int p = 1;
 
 			//We take Cylinder Path: R (surface reflection)
 			if (p == 0)
@@ -772,9 +772,7 @@ namespace KIRK {
 
 	glm::vec3 MarschnerHairBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray)
 	{
-		bool reflect = glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0;
-		if (reflect) { return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>(); }
-		return glm::vec3(0);
+		return glm::vec3(1);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////

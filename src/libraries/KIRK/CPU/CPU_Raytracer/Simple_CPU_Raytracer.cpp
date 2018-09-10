@@ -750,7 +750,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//new color absorption coefficient
 		glm::vec3 new_sigma = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);
 		//full attenuation
-		glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(glm::exp(new_sigma * (-2.f * cos_gamma_t)));
+		glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(glm::exp(new_sigma * (2.f * cos_gamma_t)));
 
 		//final term for N_trt(phi)
 		glm::vec3 n_trt = 0.5f * att_color * dh_dphi;
@@ -769,12 +769,10 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	/////////////////////////////////
 
 	//specular part of the color
-	glm::vec4 specular = glm::vec4(scat_r /*+ scat_tt + scat_trt*/, 1.0f);
+	glm::vec4 specular = glm::vec4(1000*scat_r + 10*scat_tt + 10*scat_trt, 1.0f);
 	//diffuse part of the color. Similar to Kajiya and Kay lighting
 	glm::vec4 diffuse = 0.4f * glm::sqrt(1 - sin_theta_i * sin_theta_i) * glm::vec4(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord));
 
-	KIRK::Color::RGBA color = lightShading(pos, normal, texcoord, norm_in_ray, material, KIRK::Color::RGBA(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)));
-	//return color;
 	return KIRK::Color::RGBA(specular);
 
 }
