@@ -206,7 +206,7 @@ namespace KIRK
 			 */
 			KIRK::Color::RGBA shade(Intersection &hit, int level, float weight);
 
-			/** shade
+			/** shade Marschner Hair
 			*
 			* Applies the marschner Hair shading model
 			*
@@ -216,6 +216,12 @@ namespace KIRK
 			* @return color The final color.
 			*/
 			KIRK::Color::RGBA shadeMarschnerHair(Intersection &hit, int level, float weight);
+
+			/** calculates the direct Light Influence at the hit point
+			  @param hit Intersections hit point
+			  @return color The Color of the direct Light.
+			*/
+			KIRK::Color::RGBA calcDirectLight(const KIRK::Intersection& hit);
 
 			// Predefined PoissonDisks for poissonDisk Sampling
 			std::vector<std::vector<PoissonGenerator::sPoint>> m_poissonDisks{

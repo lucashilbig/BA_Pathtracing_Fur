@@ -769,13 +769,76 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	/////////////////////////////////
 
 	//specular part of the color
-	glm::vec4 specular = glm::vec4(1000*scat_r + 10*scat_tt + 10*scat_trt, 1.0f);
-	//diffuse part of the color. Similar to Kajiya and Kay lighting
-	glm::vec4 diffuse = 0.4f * glm::sqrt(1 - sin_theta_i * sin_theta_i) * glm::vec4(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord));
+	KIRK::Color::RGBA directLight = calcDirectLight(hit);
+	KIRK::Color::RGBA specular(1000*scat_r + 10*scat_tt + 10*scat_trt, 1.0f);
+	//KIRK::Color::RGBA specular(scat_r + scat_tt + scat_trt, 1.0f);
 
-	return KIRK::Color::RGBA(specular);
+	//diffuse part of the color. Similar to Kajiya and Kay lighting
+	//glm::vec4 diffuse = 0.4f * glm::sqrt(1 - sin_theta_i * sin_theta_i) * glm::vec4(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord));
+
+	return directLight * specular * glm::cos(theta_i);//Scattering Integral. MarschnerPaper Equation 1
 
 }
+
+KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::calcDirectLight(const KIRK::Intersection & hit)
+{
+	Color::RGBA directLight(0.0f);
+
+	if (m_cpuscene->getLights().size() == 0)
+		return directLight;
+
+	/*******************************************************/
+	/******************* LIGHT SAMPLING ********************/
+	/*******************************************************/
+	//Random Value between 0 and 1, to select light source randomly
+	std::random_device rd;
+	std::mt19937 gen = std::mt19937(rd());
+	std::uniform_real_distribution<> dist{ 0, 1 };
+
+	int lightIndex = dist(gen) * m_cpuscene->getLights().size();
+	auto light = m_cpuscene->getLights()[lightIndex].get();
+
+	float attenuation;
+	KIRK::Ray hitToLight = light->calcLightdir(hit.m_location, attenuation, true);//calculates ray from intersection point towards light source
+	glm::vec3 lightpos = hitToLight.m_origin + hitToLight.m_direction;
+	hitToLight.m_origin += 1e-4f * glm::faceforward(hit.m_normal, hitToLight.m_origin - lightpos, hit.m_normal);
+	hitToLight.m_direction = glm::normalize(hitToLight.m_direction);
+
+	attenuation = 1;//set attenuation to 1 because we already calculated attenuation factor in the bsdf sample
+
+	auto lightColor = light->m_color;
+
+	if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
+	{
+		lightColor *= attenuation//attenuation factor of the light. Calculated in light->calcLightdir()
+			* std::abs(glm::dot(hitToLight.m_direction, hit.m_normal));//angle between ray towards light and normal
+
+		if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
+		{
+			float t_max = glm::length(lightpos - hitToLight.m_origin);
+			bool hitToLight_hasIntersection = m_cpuscene->getDataStructure().isIntersection(&hitToLight, t_max);
+			if (!hitToLight_hasIntersection)
+			{
+				// Test for light Intersections
+				for (int i = 0; i < m_cpuscene->getLights().size(); i++)
+				{
+					auto lightIntersectionTest = m_cpuscene->getLights()[i].get();
+					float t;
+					if (lightIntersectionTest->isIntersection(hitToLight, t) && (t < t_max))
+					{
+						hitToLight_hasIntersection = true;
+						break;
+					}
+				}
+			}
+			lightColor *= !hitToLight_hasIntersection;
+		}
+		directLight += lightColor;
+	}
+
+	return directLight;
+}
+
 
 
 void KIRK::CPU::SimpleCPURaytracer::onGui()

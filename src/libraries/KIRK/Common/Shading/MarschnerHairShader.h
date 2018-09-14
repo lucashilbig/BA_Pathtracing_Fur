@@ -65,20 +65,19 @@ namespace KIRK {
 		Color::RGBA directLight;
 
 		//Ambient light
-		ambientLight = pathtracer.getScene().getEnvironment().getAmbientLight() * glm::vec4(bsdf->evaluateLight(hit, hit.m_normal, hit.m_normal) * glm::one_over_pi<float>(), 1.0f);
+		//ambientLight = pathtracer.getScene().getEnvironment().getAmbientLight() * glm::vec4(bsdf->evaluateLight(hit, hit.m_normal, hit.m_normal) * glm::one_over_pi<float>(), 1.0f);
+		//accumulatedColor += ambientLight * glm::vec4(resultBounce.radiance, 1.0f);
 		
 		//Calculate direct Light from all light Sources. 
-		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());
-
-		//Add color from light sources together
-		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);
-		accumulatedColor += ambientLight * glm::vec4(resultBounce.radiance, 1.0f);
+		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());		
+		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);//add direct light to color
 		
 		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
 		if (reflectance == glm::vec3(0.f) || pdf <= 1E-4f || std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 			resultBounce.radiance = glm::vec3(0);
 		else
-			resultBounce.radiance *= 3 * reflectance * glm::abs(glm::dot(result_direction, hit.m_normal)) / pdf;//glm::abs(glm::cos(sample.x))
+			resultBounce.radiance *= reflectance * glm::abs(glm::dot(glm::normalize(result_direction), hit.m_normal)) / pdf;//Part of Rendering Equation 
+		
 
 		resultBounce.color += accumulatedColor;
 	}
@@ -98,18 +97,20 @@ namespace KIRK {
 		auto light = pathtracer.getScene().getLights()[lightIndex].get();
 
 		float attenuation;
-		KIRK::Ray hitToLight = light->calcLightdir(hit.m_location, attenuation, true);
+		KIRK::Ray hitToLight = light->calcLightdir(hit.m_location, attenuation, true);//calculates ray from intersection point towards light source
 		glm::vec3 lightpos = hitToLight.m_origin + hitToLight.m_direction;
 		hitToLight.m_origin += 1e-4f * glm::faceforward(hit.m_normal, hitToLight.m_origin - lightpos, hit.m_normal);
 		hitToLight.m_direction = glm::normalize(hitToLight.m_direction);
+		
+		attenuation = 1;//set attenuation to 1 because we already calculated attenuation factor in the bsdf sample
 
 		auto lightColor = light->m_color;
 
 		if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
 		{
-			lightColor *= attenuation
-				* glm::vec4(hit.m_object->getMaterial()->m_bsdf->evaluateLight(hit, hitToLight.m_direction, -hit.m_ray.m_direction), 1.0f)
-				* std::abs(glm::dot(hitToLight.m_direction, hit.m_normal));
+			lightColor *= attenuation//attenuation factor of the light. Calculated in light->calcLightdir()
+				* glm::vec4(hit.m_object->getMaterial()->m_bsdf->evaluateLight(hit, hitToLight.m_direction, -hit.m_ray.m_direction), 1.0f)//light influence at hit point. calc by the bsdf
+				* std::abs(glm::dot(hitToLight.m_direction, hit.m_normal));//angle between ray towards light and normal
 
 			if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
 			{
