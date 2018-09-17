@@ -504,7 +504,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//reflect input ray on the surface
 		glm::vec3 out_ray = glm::reflect(norm_in_ray, glm::faceforward(normal, norm_in_ray, normal));
 		//rotate towards normal to account for the tilted fiber surface
-		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(alpha_r), tangent));
+		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(2 * alpha_r), tangent));
 
 		//--------------------------------------------------------------------
 		// M_r(theta_h) : Marschner marginal, longitudinal	scattering function(M)  			
@@ -527,35 +527,27 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		glm::vec3 out_ray_normplane = glm::normalize(glm::normalize(out_ray) - sin_theta_r * tangent);;//Output lightvector, projected onto the normal-plane
 		float phi = glm::acos(glm::min(1.0f, glm::dot(out_ray_normplane, in_ray_normplane)));
 		float h = glm::sin(phi) * -0.5f;//root of the approximation for phi^ in marschner paper (Equation 10) with p = 0
-		float gamma_i = glm::asin(h);
 
-		/* Since we have the normal of the intersection we can calculate gamma_i instead of the approximation that
-		*  marschner has done with the cubic function
-		*/
-		//float gamma_i = glm::angle(norm_in_ray, glm::normalize(normal));//angle between input ray and surface normal in radians
-		//float h = glm::sin(gamma_i);
-		float dh_dphi = glm::abs(-2 / glm::sqrt(1 - h * h));
+		//From ruenz12 bachelorthesis Equation 44, which derived it from marschner Equation 10.
+		float dphi_dh = -2.f / glm::sqrt(1 - h * h);
 
 		//help variables for bravais calculation
-		float cos_gamma_i = glm::cos(gamma_i);
-		float x1 = glm::sqrt(glm::pow2(material->m_ior) - glm::pow2(glm::sin(gamma_i)));
+		float cos_theta_d = glm::cos(theta_d);
+		float x1 = glm::sqrt(glm::pow2(material->m_ior) - glm::pow2(glm::sin(theta_d)));
 		//Bravais (virtual index of reflection eta_one, eta_two) calculation
-		float bravais_first = x1 / cos_gamma_i;//first bravais index (virtual eta)
-		float bravais_sec = glm::pow2(material->m_ior) * cos_gamma_i / x1;//second bravais index (virtual eta)
+		float bravais_first = x1 / cos_theta_d;//first bravais index (virtual eta)
+		float bravais_sec = glm::pow2(material->m_ior) * cos_theta_d / x1;//second bravais index (virtual eta)
 
 		//calculate attenuation factor with fresnel
-		float fresnel = BSDFHelper::dialectricFresnel(cos_gamma_i, bravais_first, bravais_sec);		
+		float fresnel = BSDFHelper::dialectricFresnel(glm::cos(glm::asin(h)), bravais_first, bravais_sec);
 
-		//final term for N_r(phi)
-		float n_r = 0.5f * fresnel * dh_dphi;
-
-		//N_r after sadeghi(Equation 6)
-		//n_r = glm::cos(phi / 2);
-
+		//final term for N_r(phi). Marschner Equation 8
+		float n_r = 0.5f * fresnel / glm::abs(2 * dphi_dh);
+		
 		//--------------------------------------------------------------------
 
 		//Final value for the combined scattering function
-		scat_r = glm::vec3(m_r * n_r / glm::pow2(glm::cos(theta_d)));
+		scat_r = glm::vec3(m_r * n_r / glm::pow2(cos_theta_d));
 	}
 
 	//////////////////////////////////////////
@@ -620,17 +612,17 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		float gamma_i = glm::asin(h);
 
 		//Bravais (virtual index of reflection eta_one, eta_two) calculation
-		float cos_gamma_i = glm::cos(gamma_i);
-		float x1 = glm::sqrt(glm::pow2(material->m_ior) - glm::pow2(glm::sin(gamma_i)));
-		float bravais_first = x1 / cos_gamma_i;//first bravais index (virtual eta)
-		float bravais_sec = glm::pow2(material->m_ior) * cos_gamma_i / x1;//second bravais index (virtual eta)
+		float cos_theta_d = glm::cos(theta_d);
+		float x1 = glm::sqrt(glm::pow2(material->m_ior) - glm::pow2(glm::sin(theta_d)));
+		float bravais_first = x1 / cos_theta_d;//first bravais index (virtual eta). From Marschner Paper appendix
+		float bravais_sec = glm::pow2(material->m_ior) * cos_theta_d / x1;//second bravais index (virtual eta)
 		float c = glm::asin(1.f / bravais_first);
 
-		//second part of N equation (first part is attenuation factor)
-		float dh_dphi = 1 / glm::abs((1 / glm::sqrt(1 - h * h)) * ((-(24 * c / glm::pow3(glm::pi<float>())) * glm::pow2(gamma_i)) + (6 * c / glm::pi<float>() - 2)));
+		//From ruenz12 bachelorthesis Equation 44, which derived it from marschner Equation 10.
+		float dphi_dh = 1.f / (1 / glm::sqrt(1 - h * h) * ((-(24 * c / glm::pow3(glm::pi<float>())) * glm::pow2(gamma_i)) + (6 * c / glm::pi<float>() - 2)));
 
 		//calculate fresnel for attenuation factor
-		float fresnel = BSDFHelper::dialectricFresnel(cos_gamma_i, bravais_first, bravais_sec);
+		float fresnel = BSDFHelper::dialectricFresnel(glm::cos(gamma_i), bravais_first, bravais_sec);
 		if (fresnel == 1) fresnel = 0.f;//so it doesnt change att_color to 0
 
 		//helper variables for attenuation
@@ -639,16 +631,13 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//attenuation factor, which contains color absorbtion
 		glm::vec3 att_color = glm::pow2(1 - fresnel) * glm::exp(new_sigma * cos_gamma_t);
 
-		//final term for N_tt(phi)
-		glm::vec3 n_tt = 0.5f * att_color * dh_dphi;
-
-		//N_tt after sadeghi(Equation 7)
-		//glm::vec3 n_tt(BSDFHelper::normal_gauss_pdf(glm::pi<float>() - phi, 0.f, 15.f));
-
+		//final term for N_tt(phi). Marschner Equation 8.
+		glm::vec3 n_tt = 0.5f * att_color / glm::abs(2 * dphi_dh);
+		
 		//--------------------------------------------------------------------
 
 		//add tt-path value to final scattering function value
-		scat_tt = (m_tt * n_tt / glm::pow2(glm::cos(theta_d)));
+		scat_tt = (m_tt * n_tt / glm::pow2(cos_theta_d));
 	}
 
 	//////////////////////////////////////////
@@ -708,40 +697,45 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		float m_trt = BSDFHelper::normal_gauss_pdf(gaussian_x, 0.0f, 2.f * beta_r);
 
 		//--------------------------------------------------------------------
-		// N_trt(phi) : Marschner conditional, azimuthal scattering function(N)
+		// N_trt(phi) : Marschner conditional, azimuthal scattering function(N) [Chapter 5.2.2]
 		//--------------------------------------------------------------------
 
 		//calculate parameters for N
 		glm::vec3 out_ray_normplane = glm::normalize(glm::normalize(out_ray) - sin_theta_r * tr_tangent);;//Output lightvector, projected onto the normal-plane
 		float phi = glm::acos(glm::min(1.0f, glm::dot(out_ray_normplane, in_ray_normplane)));
-		float gamma_i = glm::angle(norm_in_ray, glm::normalize(normal));//angle between input ray and surface normal in radians
+		float w_c = 15.f;//azimuthal width of caustic. Between 10 and 25 degrees
+		float k_g = 2.f;//glint scale factor. Between 0.5 and 5
+		float t, phi_c, h;
 
 		//help variables for bravais calculation
-		float cos_gamma_i = glm::cos(gamma_i);
-		float x1 = glm::sqrt(glm::pow2(material->m_ior) - glm::pow2(glm::sin(gamma_i)));
-		float bravais_first = x1 / cos_gamma_i;//first bravais index (virtual eta)
-		float bravais_sec = glm::pow2(material->m_ior) * cos_gamma_i / x1;//second bravais index (virtual eta)
-
+		float cos_theta_d = glm::cos(theta_d);
+		float x1 = glm::sqrt(glm::pow2(material->m_ior) - glm::pow2(glm::sin(theta_d)));
+		float bravais_first = x1 / cos_theta_d;//first bravais index (virtual eta)
+		float bravais_sec = glm::pow2(material->m_ior) * cos_theta_d / x1;//second bravais index (virtual eta)
 		float c = glm::asin(1.f / bravais_first);
-		float h = glm::sin(gamma_i);
 
-		/* Since we have the normal of the intersection we can calculate gamma_i instead of the approximation that
-		*  marschner has done with the cubic function
-		*
-		//parameters for the cubic function delta_phi(1, gamma_i) in marschner (Equation 10)
-		double pi_pow_3 = glm::pow3(std::_Pi);
-		double a1 = -16 * c / pi_pow_3;
-		double a2 = 12 * c / std::_Pi - 2;
-		double a3 = std::_Pi - (phi);
-		double x[3];//result of delta_phi(1, gamma_i)
-		BSDFHelper::SolveP3(x, 0, a2 / a1, a3 / a1);
-		*/
-
-		//second part of N equation (first part is attenuation factor)
-		float dh_dphi = 1 / glm::abs((1 / glm::sqrt(1 - h * h)) * ((-(48 * c / glm::pow3(std::_Pi)) * glm::pow2(gamma_i) + (12 * c / std::_Pi - 2))));
+		if (bravais_first < 2)//procedure from marschner paper chapter 5.2.2
+		{
+			float h_c = glm::sqrt((4 - glm::pow2(bravais_first)) / 3.f);//Marschner paper Equation 4
+			phi_c = 4 * glm::asin(h_c / bravais_first) - 2 * glm::asin(h_c) + 2 * glm::pi<float>();
+			//From ruenz12 bachelorthesis Equation 44, which derived it from marschner Equation 10.
+			float dphi_dh_h_c = 1.f / (1 / glm::sqrt(1 - h_c * h_c) * ((-(48 * c / glm::pow3(glm::pi<float>())) * glm::pow2(glm::asin(h_c)) + (12 * c / glm::pi<float>() - 2))));
+			h = glm::min(0.5f, 2 * glm::sqrt(2 * w_c / dphi_dh_h_c));
+			t = 1;
+		}
+		else
+		{
+			phi_c = 0;
+			h = 0.5f;
+			t = glm::smoothstep(2.f, 2.3f, bravais_first);
+		}
+		
+		float gamma_i = glm::asin(h);
+		//From ruenz12 bachelorthesis Equation 44, which derived it from marschner Equation 10.
+		float dphi_dh = 1.f / (1 / glm::sqrt(1 - h * h) * ((-(48 * c / glm::pow3(glm::pi<float>())) * glm::pow2(gamma_i) + (12 * c / glm::pi<float>() - 2))));
 
 		//calculate fresnel part of attenuation
-		float fresnel = BSDFHelper::dialectricFresnel(cos_gamma_i, bravais_first, bravais_sec);
+		float fresnel = BSDFHelper::dialectricFresnel(glm::cos(gamma_i), bravais_first, bravais_sec);
 		if (fresnel == 1) fresnel = 0.f;
 		float gamma_t = glm::asin(h / bravais_first);
 		float cos_gamma_t = glm::cos(gamma_t);
@@ -752,16 +746,21 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//full attenuation
 		glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(glm::exp(new_sigma * (2.f * cos_gamma_t)));
 
-		//final term for N_trt(phi)
-		glm::vec3 n_trt = 0.5f * att_color * dh_dphi;
+		//calculate gauss values for power apporximation from section 5.2.2
+		float gauss_0 = BSDFHelper::normal_gauss_pdf(w_c, 0.f, 0.f);
+		float gauss_phi_diff = BSDFHelper::normal_gauss_pdf(w_c, 0.f, phi - phi_c);
+		float gauss_phi_sum = BSDFHelper::normal_gauss_pdf(w_c, 0.f, phi + phi_c);
 
-		//N_trt after sadeghi(Equation 8)
-		/*glm::vec3 n_trt = n_r + glm::vec3(BSDFHelper::normal_gauss_pdf(35.f - phi, 0.f, 15.f));*/
+		//final term for N_trt(phi). Marschner Equation 8
+		glm::vec3 n_trt = 0.5f * att_color / glm::abs(2 * dphi_dh);
+		n_trt *= (1 - t * gauss_phi_diff / gauss_0);
+		n_trt *= (1 - t * gauss_phi_sum / gauss_0);
+		n_trt += t * k_g * att_color * h * (gauss_phi_diff + gauss_phi_sum);
 
 		//--------------------------------------------------------------------
 
 		//return final scattering function
-		scat_trt = m_trt * n_trt / glm::pow2(glm::cos(theta_d));
+		scat_trt = m_trt * n_trt / glm::pow2(cos_theta_d);
 	}
 
 	/////////////////////////////////
