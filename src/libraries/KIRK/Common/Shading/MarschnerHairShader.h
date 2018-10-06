@@ -136,7 +136,7 @@ namespace KIRK {
 		//accumulatedColor += ambientLight * glm::vec4(resultBounce.radiance, 1.0f);
 		
 		//Calculate direct Light from all light Sources. 
-		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());		
+		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());
 		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);//add direct light to color
 		
 		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
@@ -144,10 +144,10 @@ namespace KIRK {
 			|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 			resultBounce.radiance = glm::vec3(0);
 		else
-			resultBounce.radiance *= (scattering_r + scattering_tt + scattering_trt) * glm::abs(glm::dot(glm::normalize(result_direction), hit.m_normal)) / pdf;//Part of Rendering Equation 
+			resultBounce.radiance *= (scattering_r + scattering_tt + scattering_trt) * glm::cos(sample.x);//Part of Rendering Equation. MarschnerPaper Equation 1
 		
 
-		resultBounce.color += accumulatedColor * glm::cos(sample.x);//Scattering Integral. MarschnerPaper Equation 1
+		resultBounce.color += accumulatedColor;
 	}
 
 
@@ -180,7 +180,7 @@ namespace KIRK {
 				* glm::vec4(hit.m_object->getMaterial()->m_bsdf->evaluateLight(hit, hitToLight.m_direction, -hit.m_ray.m_direction), 1.0f)//light influence at hit point. calc by the bsdf
 				* std::abs(glm::dot(hitToLight.m_direction, hit.m_normal));//angle between ray towards light and normal
 
-			if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
+			if (lightColor.x > 0 || lightColor.y > 0 || lightColor.z > 0)
 			{
 				float t_max = glm::length(lightpos - hitToLight.m_origin);
 				bool hitToLight_hasIntersection = pathtracer.getScene().getDataStructure().isIntersection(&hitToLight, t_max);

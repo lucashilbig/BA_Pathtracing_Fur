@@ -447,9 +447,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shade(Intersection &hit, int le
 
 KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection &hit, int level, float weight)
 {
-
 	// get the objected we hit. static_cast cause we checked correct object type in render method already
-	//Cylinder *cylinder_obj = static_cast<KIRK::Cylinder*>(hit.m_object);
 	KIRK::Object *cylinder_obj = hit.m_object;
 
 	// calculation of the normal
@@ -469,8 +467,9 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	glm::vec3 tangent = (glm::length(c1) > glm::length(c2)) ? glm::normalize(c1) : glm::normalize(c2);
 
 	//calculate angles of the incoming ray that we need in every path and are the same in every path
+	float cos_theta_i = glm::dot(norm_in_ray, normal);
 	float sin_theta_i = glm::dot(norm_in_ray, tangent);
-	float theta_i = glm::asin(sin_theta_i);//Angle between input ray and fibers normal-plane
+	float theta_i = glm::acos(cos_theta_i);//Angle between input ray and fibers normal-plane
 
 	//Input lightvector, projected onto the normal-plane
 	glm::vec3 in_ray_normplane = glm::normalize(norm_in_ray - sin_theta_i * tangent);
@@ -491,9 +490,8 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	//  HOW THE FOLLOWING STEPS WORK:
 	//  1) We trace a Ray for every Cylinder-Path. R, TT and TRT
 	//  2) We sum the Scattering values from each Path to the final Scattering value.
-	//  3) Finally, we calculate the color with the scattering value
-	////////////////////////////////////////////////////////////////////
-	float n_r;
+	//  3) Finally, we calculate the color with the scattering value and the direct Light at the intersection point
+	////////////////////////////////////////////////////////////////////	
 
 	//////////////////////////////////////////
 	////
@@ -511,8 +509,9 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//--------------------------------------------------------------------
 
 		//calculate parameters for M
+		float cos_theta_r = glm::dot(glm::normalize(out_ray), normal);
 		float sin_theta_r = glm::dot(glm::normalize(out_ray), tangent);
-		float theta_r = glm::asin(sin_theta_r);//Angle between reflected output ray and fibers normal-plane	
+		float theta_r = glm::acos(cos_theta_r);//Angle between reflected output ray and fibers normal-plane	
 		float theta_h = (theta_r + theta_i) / 2;//theta half angle
 		float theta_d = (theta_r - theta_i) / 2;//theta difference angle
 
@@ -582,8 +581,9 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		// M_tt(theta_h) : Marschner marginal, longitudinal	scattering function(M)  
 		//--------------------------------------------------------------------
 		//calculate parameters for M
+		float cos_theta_r = glm::dot(glm::normalize(out_ray), t_normal);
 		float sin_theta_r = glm::dot(glm::normalize(out_ray), t_tangent);
-		float theta_r = glm::asin(sin_theta_r);//Angle between reflected output ray and fibers normal-plane	
+		float theta_r = glm::acos(cos_theta_r);//Angle between reflected output ray and fibers normal-plane	
 		float theta_h = (theta_r + theta_i) / 2.f;//theta half angle
 		float theta_d = (theta_r - theta_i) / 2.f;//theta difference angle
 		float gaussian_x = theta_h - glm::radians((-alpha_r / 2.f));//longitudinal shift for TT-Path is smaller than for R-Path
@@ -599,11 +599,6 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		glm::vec3 out_ray_normplane = glm::normalize(glm::normalize(out_ray) - sin_theta_r * t_tangent);;//Output lightvector, projected onto the normal-plane
 		float phi = glm::acos(glm::min(1.0f, glm::dot(out_ray_normplane, in_ray_normplane)));
 
-		/* Since we have the normal of the intersection we can calculate gamma_i instead of the approximation that
-		*  marschner has done with the cubic function
-		*/
-		//float gamma_i = glm::angle(norm_in_ray, glm::normalize(normal));//angle between input ray and surface normal in radians
-		//float h = glm::sin(gamma_i);
 
 		//calculation of h from marschner but the concrete equation is from d'Eon paper (Above Equation 9)
 		float a = 1 / material->m_ior;
@@ -623,7 +618,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 
 		//calculate fresnel for attenuation factor
 		float fresnel = BSDFHelper::dialectricFresnel(glm::cos(gamma_i), bravais_first, bravais_sec);
-		if (fresnel == 1) fresnel = 0.f;//so it doesnt change att_color to 0
+		if (fresnel == 1.f) fresnel = 0.f;
 
 		//helper variables for attenuation
 		float cos_gamma_t = 2.f * glm::cos(glm::asin(h / bravais_first));
@@ -687,8 +682,9 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//--------------------------------------------------------------------
 
 		//calculate parameters for M
+		float cos_theta_r = glm::dot(glm::normalize(out_ray), tr_normal);
 		float sin_theta_r = glm::dot(glm::normalize(out_ray), tr_tangent);
-		float theta_r = glm::asin(sin_theta_r);//Angle between reflected output ray and fibers normal-plane	
+		float theta_r = glm::acos(cos_theta_r);//Angle between reflected output ray and fibers normal-plane	
 		float theta_h = (theta_r + theta_i) / 2.f;//theta half angle
 		float theta_d = (theta_r - theta_i) / 2.f;//theta difference angle
 		float gaussian_x = theta_h - glm::radians((-3 * alpha_r / 2.f));//longitudinal shift for TT-Path is smaller than for R-Path
@@ -717,10 +713,10 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		if (bravais_first < 2)//procedure from marschner paper chapter 5.2.2
 		{
 			float h_c = glm::sqrt((4 - glm::pow2(bravais_first)) / 3.f);//Marschner paper Equation 4
-			phi_c = 4 * glm::asin(h_c / bravais_first) - 2 * glm::asin(h_c) + 2 * glm::pi<float>();
+			phi_c = glm::radians(4 * glm::asin(h_c / bravais_first) - 2 * glm::asin(h_c) + 2 * glm::pi<float>());
 			//From ruenz12 bachelorthesis Equation 44, which derived it from marschner Equation 10.
 			float dphi_dh_h_c = 1.f / (1 / glm::sqrt(1 - h_c * h_c) * ((-(48 * c / glm::pow3(glm::pi<float>())) * glm::pow2(glm::asin(h_c)) + (12 * c / glm::pi<float>() - 2))));
-			h = glm::min(0.5f, 2 * glm::sqrt(2 * w_c / dphi_dh_h_c));
+			h = glm::min(0.5f, 2 * glm::sqrt(2 * w_c / glm::abs(dphi_dh_h_c)));
 			t = 1;
 		}
 		else
@@ -736,7 +732,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 
 		//calculate fresnel part of attenuation
 		float fresnel = BSDFHelper::dialectricFresnel(glm::cos(gamma_i), bravais_first, bravais_sec);
-		if (fresnel == 1) fresnel = 0.f;
+		if (fresnel == 1.f) fresnel = 0.f;
 		float gamma_t = glm::asin(h / bravais_first);
 		float cos_gamma_t = glm::cos(gamma_t);
 		float fresnel_exit = BSDFHelper::dialectricFresnel(cos_gamma_t, 1 / bravais_first, 1 / bravais_sec);
@@ -747,9 +743,9 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(glm::exp(new_sigma * (2.f * cos_gamma_t)));
 
 		//calculate gauss values for power apporximation from section 5.2.2
-		float gauss_0 = BSDFHelper::normal_gauss_pdf(w_c, 0.f, 0.f);
-		float gauss_phi_diff = BSDFHelper::normal_gauss_pdf(w_c, 0.f, phi - phi_c);
-		float gauss_phi_sum = BSDFHelper::normal_gauss_pdf(w_c, 0.f, phi + phi_c);
+		float gauss_0 = BSDFHelper::normal_gauss_pdf(0.f, 0.f, w_c);
+		float gauss_phi_diff = BSDFHelper::normal_gauss_pdf(phi - phi_c, 0.f, w_c);
+		float gauss_phi_sum = BSDFHelper::normal_gauss_pdf(phi + phi_c, 0.f, w_c);
 
 		//final term for N_trt(phi). Marschner Equation 8
 		glm::vec3 n_trt = 0.5f * att_color / glm::abs(2 * dphi_dh);
@@ -775,7 +771,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	//diffuse part of the color. Similar to Kajiya and Kay lighting
 	//glm::vec4 diffuse = 0.4f * glm::sqrt(1 - sin_theta_i * sin_theta_i) * glm::vec4(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord));
 
-	return directLight * specular * glm::cos(theta_i);//Scattering Integral. MarschnerPaper Equation 1
+	return directLight * KIRK::Color::RGBA(1000 * scat_r, 1.f) * glm::cos(theta_i);//Scattering Integral. MarschnerPaper Equation 1
 
 }
 
@@ -812,7 +808,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::calcDirectLight(const KIRK::Int
 		lightColor *= attenuation//attenuation factor of the light. Calculated in light->calcLightdir()
 			* std::abs(glm::dot(hitToLight.m_direction, hit.m_normal));//angle between ray towards light and normal
 
-		if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
+		if (lightColor.x > 0 || lightColor.y > 0 || lightColor.z > 0)
 		{
 			float t_max = glm::length(lightpos - hitToLight.m_origin);
 			bool hitToLight_hasIntersection = m_cpuscene->getDataStructure().isIntersection(&hitToLight, t_max);

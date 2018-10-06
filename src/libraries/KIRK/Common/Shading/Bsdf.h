@@ -236,6 +236,21 @@ public:
 	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
 
 	static glm::vec3 evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray);
+private:
+	/*@brief Calculates d'Eon marginal, longitudinal scattering function(M_p) after d'Eon Equation 7
+	* @param cos_theta_c theta cone angle from d'Eon 2013 paper
+	*/
+	static float M_p(float cos_theta_c, float cos_theta_r, float sin_theta_c, float sin_theta_r, float v);
+
+	/*@brief Calculates the bessel function (first kind, 0 order).
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	inline static float bessel(float x);
+
+	/*@brief Calculates the logarithm of the bessel function (first kind, 0 order). For x values > 12 it will use different calc than bessel.
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	inline static float logBessel(float x);
 };
 
 const BsdfRegistrator <DEonHairBSDF> dEonHairBSDFRegistrator("DEonHairBSDF");
