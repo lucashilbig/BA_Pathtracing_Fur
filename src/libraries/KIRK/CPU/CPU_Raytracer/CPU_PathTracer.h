@@ -24,6 +24,7 @@ struct Bounce
 {
 	Color::RGBA color;
 	glm::vec3 radiance;
+	int bounce_count;
 	int mat_flags;
 };
 

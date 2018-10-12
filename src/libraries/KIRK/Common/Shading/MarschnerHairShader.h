@@ -48,12 +48,30 @@ namespace KIRK {
 		std::uniform_real_distribution<float> dist(5.0f, std::nextafter(10.0f, DBL_MAX));//std::nextafter so we get the [5,10] interval instead of [5,10)
 		//We use the sample parameter, because we dont need it in the bsdf and we cant get rid of it cause of inherited method signature.
 		sample.x = -1.0f * dist(m_gen);//longitudinal shift. Suggested value from marschner hair paper between -10 and -5 degrees
-		sample.y = dist(m_gen);//longitudinal width (stdev.). Suggested value from marschner hair paper between 5 and 10 degrees	
+		sample.y = dist(m_gen);//longitudinal width (stdev.). Suggested value from marschner hair paper between 5 and 10 degrees
 
+		//////////////////////////////////////////////
+		// Get random Light Source to sample
+		//////////////////////////////////////////////
+		if (pathtracer.getScene().getLights().size() == 0)//If we have no Light Source we cant see objects anyways
+			return;
+
+		//Select one random light source from all lights
+		int lightIndex = m_dist(m_gen) * pathtracer.getScene().getLights().size();
+		auto light = pathtracer.getScene().getLights()[lightIndex].get();
+		float attenuation;		
+		
 		//////////////////////////////////////////////
 		//  R-PATH: Scattered Light calculation (RGB)
 		//////////////////////////////////////////////
-		glm::vec3 scattering_r = bsdf->sample(hit, input_ray_normalized, hit.m_normal, result_direction_r, pdf_r, resultBounce.mat_flags, sample); // Sample bsdf for r-path
+
+		//calculate ray from intersection point towards light source
+		KIRK::Ray hitToLight = light->calcLightdir(hit.m_location, attenuation, true);
+		//use the output_ray to pass the hit_to_light direction to the bsdf sampling method
+		result_direction_r = hitToLight.m_direction;
+
+		// Sample bsdf for r-path
+		glm::vec3 scattering_r = bsdf->sample(hit, input_ray_normalized, hit.m_normal, result_direction_r, pdf_r, resultBounce.mat_flags, sample); 
 
 		//////////////////////////////////////////////
 		//  TT-PATH: Scattered Light calculation (RGB)
@@ -75,6 +93,11 @@ namespace KIRK {
 			t_normal = -hit.m_normal;
 			t_hit.m_object = hit.m_object;
 		}
+
+		//calculate ray from intersection point towards light source
+		hitToLight = light->calcLightdir(t_hit.m_location, attenuation, true);
+		//use the output_ray to pass the hit_to_light direction to the bsdf sampling method
+		result_direction_tt = hitToLight.m_direction;
 
 		//set the material flags to TT-Path
 		resultBounce.mat_flags = BSDFHelper::MATFLAG_CYLINDER_T_BOUNCE;
@@ -101,6 +124,11 @@ namespace KIRK {
 			tr_normal = hit.m_normal;
 			tr_hit.m_object = hit.m_object;
 		}
+
+		//calculate ray from intersection point towards light source
+		hitToLight = light->calcLightdir(tr_hit.m_location, attenuation, true);
+		//use the output_ray to pass the hit_to_light direction to the bsdf sampling method
+		result_direction_trt = hitToLight.m_direction;
 
 		//set the material flags to TRT-Path
 		resultBounce.mat_flags = BSDFHelper::MATFLAG_CYLINDER_TR_BOUNCE;
@@ -139,15 +167,20 @@ namespace KIRK {
 		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());
 		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);//add direct light to color
 		
+
+		resultBounce.bounce_count++;
+
 		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
 		if ((scattering_r + scattering_tt + scattering_trt) == glm::vec3(0.f) || pdf <= 1E-4f 
 			|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 			resultBounce.radiance = glm::vec3(0);
 		else
-			resultBounce.radiance *= (scattering_r + scattering_tt + scattering_trt) * glm::cos(sample.x);//Part of Rendering Equation. MarschnerPaper Equation 1
+			resultBounce.radiance *= glm::min((scattering_r) / pdf, 1.0f);//Render-Equation. Theta_i is stored in sample.x and pdf is to account for radiance fallof
 		
 
-		resultBounce.color += accumulatedColor;
+		resultBounce.color += accumulatedColor * glm::abs(glm::cos(sample.x));
+		//resultBounce.color = glm::min(resultBounce.color, 1.f);
+
 	}
 
 
@@ -170,8 +203,6 @@ namespace KIRK {
 		hitToLight.m_origin += 1e-4f * glm::faceforward(hit.m_normal, hitToLight.m_origin - lightpos, hit.m_normal);
 		hitToLight.m_direction = glm::normalize(hitToLight.m_direction);
 		
-		attenuation = 1;//set attenuation to 1 because we already calculated attenuation factor in the bsdf sample
-
 		auto lightColor = light->m_color;
 
 		if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)

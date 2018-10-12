@@ -3,6 +3,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
+#include <vector>
 
 #include "KIRK/Utils/Log.h"
 #include "KIRK/Utils/Threading.h"
@@ -20,6 +21,8 @@ public:
 	static const int MATFLAG_EMISSIVE_BOUNCE = 1 << 2;
 	static const int MATFLAG_CYLINDER_T_BOUNCE = 1 << 3;
 	static const int MATFLAG_CYLINDER_TR_BOUNCE = 1 << 4;
+
+	static const float SQRT_PI_OVER_8;
 
 
 	/**
@@ -44,6 +47,48 @@ public:
 	*/
 	static float normal_gauss_pdf(float x, float mean, float stddev);
 
+	/*@brief Calculates the bessel function (first kind, 0 order).
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static float bessel(float x);
+
+	/*@brief Calculates the logarithm of the bessel function (first kind, 0 order). For x values > 12 it will use different calc than bessel.
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static float logBessel(float x);
+
+	/*@brief Calculates the logistic function
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static float Logistic(float x, float s);
+
+	/*@brief 
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static float LogisticCDF(float x, float s);
+
+	/*@brief
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static float TrimmedLogistic(float x, float s, float a, float b);
+
+	/*@brief Samples the trimmed logistic function
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static float SampleTrimmedLogistic(float u, float s, float a, float b);
+
+	/*@brief
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static float Phi(int p, float gammaO, float gammaT);
+
+	/*@brief
+	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+	static glm::vec2 DemuxFloat(float f);
+
+	// https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
+	static uint32_t Compact1By1(uint32_t x);
 
 	/**
 	* @brief Calculate the Fresnel value with Schlick's formula which is much easier to understand and should be short and therefore pretty fast.
@@ -81,6 +126,7 @@ private:
 	//=============================================================================
 	static double _root3(double x);
 	static double root3(double x);
+	
 };
 
 typedef std::function <glm::vec3 (const Intersection&, const glm::vec3&, const glm::vec3&, glm::vec2&, glm::vec3&, float&, int&, bool)> localSample_func;
@@ -111,7 +157,7 @@ public:
 	* @return The amount of influence a light has on the hit point color.
 	*/
     glm::vec3 evaluateLight (const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) { return m_evaluateLight(hit, local_input_ray, local_output_ray); }
-
+	
     std::string getName()
 	{ return m_name; }
 
@@ -225,6 +271,18 @@ public:
 	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
 
 	static glm::vec3 evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray);
+	/* Calculates the sigma color absorption from an rgb color using Chiang paper Equation 9
+	@param color. RGB Color which the hair should have
+	@param beta_n. azimuthal roughness parameter. Values [0, 1]
+	*/
+	static glm::vec3 calcSigmaFromColor(KIRK::Color::RGBA color, float beta_n = 0.3f);
+
+	/* Calculates the color absorption factor using Equation of Marschner Paper section 4.3
+	@param sigma_a. The color absorption coefficient sigma_a
+	@param gamma_t. fibers internal offset angle gamma_t
+	*/
+	static glm::vec3 T(glm::vec3 sigma_a, float gamma_t);
+	
 };
 
 const BsdfRegistrator <MarschnerHairBSDF> marschnerHairBSDFRegistrator("MarschnerHairBSDF");
@@ -236,24 +294,66 @@ public:
 	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
 
 	static glm::vec3 evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray);
-private:
+
 	/*@brief Calculates d'Eon marginal, longitudinal scattering function(M_p) after d'Eon Equation 7
 	* @param cos_theta_c theta cone angle from d'Eon 2013 paper
 	*/
 	static float M_p(float cos_theta_c, float cos_theta_r, float sin_theta_c, float sin_theta_r, float v);
-
-	/*@brief Calculates the bessel function (first kind, 0 order).
-	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
-	*/
-	inline static float bessel(float x);
-
-	/*@brief Calculates the logarithm of the bessel function (first kind, 0 order). For x values > 12 it will use different calc than bessel.
-	* Function is taken from PBRT: Copyright(c) 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
-	*/
-	inline static float logBessel(float x);
+	
 };
 
 const BsdfRegistrator <DEonHairBSDF> dEonHairBSDFRegistrator("DEonHairBSDF");
+
+////////////////////////////////////////////////////////////////////////////////////
+
+class ChiangHairBSDF
+{
+	/* Implements "A Practical and Controllable Hair and Fur Model for Production Path Tracing" from Chiang et. al. (2016)
+	Most parts of this class implementation are taken from PBRTv3 therefor Credit and Copyright(c) goes to 1998-2016 Matt Pharr, Greg Humphreys, and Wenzel Jakob.
+	*/
+public:
+	//Sample functions
+	static glm::vec3 localSample(const Intersection& hit, const glm::vec3& local_space_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance = true);
+
+	static glm::vec3 evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray);
+
+	glm::vec3 Sample_f(const glm::vec3 &wi, glm::vec3 *wo, const glm::vec2 &u2, float *pdf) const;
+
+	//Extracts needed variables from material and sets members of bsdf. NEEDS TO BE CALLED BEFORE USING BSDF
+	void init(float offset_h, float mat_beta_m, float mat_beta_n, float mat_alpha, float mat_eta, glm::vec3 color);
+	
+private:
+	glm::vec3 f(const glm::vec3 &wi, const glm::vec3 &wo) const;
+	float Pdf(const glm::vec3 &wi, const glm::vec3 &wo) const;
+
+	std::vector<float> ComputeApPdf(float cosThetaO) const;
+
+	static std::vector<glm::vec3> Ap(float cosThetaO, float eta, float h, const glm::vec3 &T);
+
+	static float Np(float phi, int p, float s, float gammaO, float gammaT);
+	
+	//////////////////
+	////// Member: Hair private data
+	/////////////////
+	float h;//offset along the cylinder width where the ray intersected the circular cross section. Values [-1, 1]
+	float gammaO;//angle between the outgoing ray and normal
+
+	glm::vec3 sigma_a;//Color absorbtion coefficent
+	float sin2kAlpha[3], cos2kAlpha[3];//Alpha terms for hair scale
+
+	static const int pMax = 3;//maximal internal fiber pathes that will be taken by the bsdf
+
+	//Controllability parameters from Chiang paper section 4
+	float eta;//Index of Refraction
+	float v[pMax + 1];//longitudinal surface roughness variance v. Depending on beta_m
+	float s;//logistic scale factor. Depending on beta_n
+	float beta_m;//longitudinal roughness parameter. Values [0, 1]
+	float beta_n;//azimuthal roughness parameter Values [0, 1]
+	float alpha;//angle that the hair scales are tilted at the surface. Stored in degrees	
+};
+
+const BsdfRegistrator <ChiangHairBSDF> chiangHairBSDFRegistrator("ChiangHairBSDF");
+
 
 }
 #endif

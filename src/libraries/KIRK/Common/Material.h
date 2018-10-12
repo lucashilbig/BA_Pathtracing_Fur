@@ -15,9 +15,11 @@
 
 namespace KIRK {
 
-/**
-A collection of possible texture/color map types.
-*/
+	class ChiangHairBSDF;
+
+	/**
+	A collection of possible texture/color map types.
+	*/
 	enum class MatParamType
 	{
 		DIFFUSE,
@@ -28,7 +30,8 @@ A collection of possible texture/color map types.
 		TRANSPARENCY,
 		REFLECTIVITY,
 		ROUGHNESS,
-		BUMP
+		BUMP,
+		SIGMA_A
 	};
 
 	/**
@@ -58,7 +61,7 @@ A collection of possible texture/color map types.
 		@param name The unique material name.
 		*/
 		Material(std::string name);
-		Material(std::string name, bool marschnerHair);
+		Material(std::string name, int bsdf);//bsdf values : 0 = LambertianReflection, 6 = MarschnerHair, 7 = D'Eon Hair, 8 = ChiangHair(USE ChiangHairMaterial Class for this one)
 
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		//////
@@ -71,6 +74,7 @@ A collection of possible texture/color map types.
 		MatParamColor m_normal = { Color::GREEN };				//!< Normal map. Color::GREEN is equivalent to the up-vector (0,1,0)
 		MatParamColor m_volume = { Color::WHITE };				//!< Color which will be used for refractions.
 		MatParamColor m_emission = { Color::BLACK };				//!< Emissive color. Only used in Pathtracers.
+		MatParamColor m_sigma_a = { KIRK::Color::RGBA(0.84f, 1.39f, 2.74f, 1.f) }; //!< Hair's color absorption coefficient. Default for Brown hair. Only used in HairBSDF's of Pathtracers.
 
 		MatParamFloat m_transparency = { 0.f };					//!< Material transparency. (0 is fully opaque, 1 fully transparent)
 		MatParamFloat m_reflectivity = { 0.f };					//!< Material reflectivity. Nothing to say here.
@@ -82,11 +86,17 @@ A collection of possible texture/color map types.
 		std::string name = "";		//!< Material name. This one is unique!
 		float m_ior = 1.52f;		//!< Index of refraction for this Material.
 
-        std::shared_ptr<KIRK::Shader> m_shader;            //!< Shader
-        std::shared_ptr<KIRK::BSDF> m_bsdf;			//!< BSDF for pathtracing.
+		//Controllability parameters from Chiang paper section 4
+		float m_beta_m = 0.3f;//longitudinal roughness parameter. Values [0, 1]
+		float m_beta_n = 0.3f;//azimuthal roughness parameter Values [0, 1]
+		float m_alpha = 2.f;//angle that the hair scales are tilted at the surface. Stored in degrees	
+
+		std::shared_ptr<KIRK::Shader> m_shader;            //!< Shader
+		std::shared_ptr<KIRK::BSDF> m_bsdf;			//!< BSDF for pathtracing.
+		std::shared_ptr<KIRK::ChiangHairBSDF> m_hairBSDF; //ChiangHairBSDF for hair rendering
 
 		//ImGui parameters
-		int m_current_bsdf = 0;
+		int m_current_bsdf;
 
 		/**
 		* Fetches a color from a MatParamColor object. If it has a texture, the texcoord will be used to get
@@ -149,7 +159,15 @@ A collection of possible texture/color map types.
 		*/
 		float getFromParam(const MatParamFloat &floatParam, const glm::vec2 &texcoord) const;
 
+		/**
+		Returns a pointer to the bsdf specified in the parameter. Also sets the used m_shader.
+		BSDF's are: 0 = LambertianReflectanceBSDF, 1 = SpecularReflectionBSDF, 2 = GlassBSDF, 3 = LambertianTransmissionBSDF, 4 = EmissionBSDF, 5 = TransparentBSDF,
+					6 = MarschnerHairBSDF, 7 = DEonHairBSDF, 8 = ChiangHairBSDF
+		*/
+		std::shared_ptr<KIRK::BSDF> initBSDF(int bsdf);
+
 	};
+
 	// DIFFUSE COLOR
 	template<>
 	inline Color::RGBA Material::fetchParameterColor<MatParamType::DIFFUSE>(const glm::vec2 &texcoord) const
@@ -183,6 +201,13 @@ A collection of possible texture/color map types.
 	inline Color::RGBA Material::fetchParameterColor<MatParamType::EMISSION>(const glm::vec2 &texcoord) const
 	{
 		return getFromParam(m_emission, texcoord);
+	}
+
+	//SIGMA_A VALUE
+	template<>
+	inline Color::RGBA Material::fetchParameterColor<MatParamType::SIGMA_A>(const glm::vec2 &texcoord) const
+	{
+		return getFromParam(m_sigma_a, texcoord);
 	}
 
 	// TRANSPARENCY VALUE

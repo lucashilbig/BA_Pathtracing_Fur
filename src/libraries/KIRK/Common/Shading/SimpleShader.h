@@ -58,6 +58,8 @@ inline void SimpleShader::shade(KIRK::CPU::PathTracer& pathtracer, const KIRK::I
 	// how much light (r, g, b) gets reflected in this hit point
 	glm::vec3 reflectance = bsdf->sample(hit, counter_ray, hit.m_normal, result_direction, pdf, mat_flags, sample); // Sample bsdf
 
+	resultBounce.bounce_count++;
+
 	if(reflectance == glm::vec3(0.f) || pdf <= 1E-4f
 		|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 	{

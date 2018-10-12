@@ -461,30 +461,44 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	Material* material = hit.m_object->getMaterial();
 	glm::vec3 norm_in_ray = glm::normalize(hit.m_ray.m_direction);//normalized input ray
 
+	/*******************************************************/
+	/******************* LIGHT SAMPLING ********************/
+	/*******************************************************/
+	//Random Value between 0 and 1, to select light source randomly
+	std::random_device rd;
+	std::mt19937 gen = std::mt19937(rd());
+	std::uniform_real_distribution<> dist_01{ 0, 1 };
+
+	int lightIndex = dist_01(gen) * m_cpuscene->getLights().size();
+	auto light = m_cpuscene->getLights()[lightIndex].get();
+
+	float attenuation;
+	KIRK::Ray hitToLightRay = light->calcLightdir(hit.m_location, attenuation, true);//calculates ray from intersection point towards light source
+	/*******************************************************/  
+
 	//calculation of tangent vector
 	glm::vec3 c1 = glm::cross(normal, glm::vec3(0.0, 0.0, 1.0));
 	glm::vec3 c2 = glm::cross(normal, glm::vec3(0.0, 1.0, 0.0));
 	glm::vec3 tangent = (glm::length(c1) > glm::length(c2)) ? glm::normalize(c1) : glm::normalize(c2);
 
-	//calculate angles of the incoming ray that we need in every path and are the same in every path
-	float cos_theta_i = glm::dot(norm_in_ray, normal);
-	float sin_theta_i = glm::dot(norm_in_ray, tangent);
-	float theta_i = glm::acos(cos_theta_i);//Angle between input ray and fibers normal-plane
+	//move light ray to cylinders (fibers) local space.
+	/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model
+	and we used the local_output_ray to store our ray towards the light source we want to sample*/
+	glm::vec3 hit_to_light = Math::worldToLocal(glm::normalize(hitToLightRay.m_direction), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
 
-	//Input lightvector, projected onto the normal-plane
-	glm::vec3 in_ray_normplane = glm::normalize(norm_in_ray - sin_theta_i * tangent);
-
+	//calculate spherical coordinates of light ray. NOTE: std::atan2 is atan(y/x) using the signs of arguments to determine the correct quadrant
+	float theta_i = std::atan2(hit_to_light.x, hit_to_light.z);//Angle between light ray and fibers v-w(normal-)plane(Inclinations with respect of the fibers normalplane)
+	float phi_i = std::atan2(std::hypot(hit_to_light.x, hit_to_light.z), hit_to_light.y);//azimuth angle. Around x(fibers u-)-axis
+	
 	//values of scattering function parts
 	glm::vec3 scat_r(0.f);
 	glm::vec3 scat_tt(0.f);
 	glm::vec3 scat_trt(0.f);
 
 	//random generator for lobe alpha shift and beta width
-	std::random_device rd;
-	std::mt19937 mt(rd());
 	std::uniform_real_distribution<float> dist(5.0f, std::nextafter(10.0f, DBL_MAX));//std::nextafter so we get the [5,10] interval instead of [5,10)
-	float alpha_r = -1.0f * dist(mt);//longitudinal shift: R lobe. Suggested value from marschner hair paper between -10 and -5 degrees
-	float beta_r = dist(mt);//longitudinal width (stdev.): R lobe. Suggested value from marschner hair paper between 5 and 10 degrees		
+	float alpha_r = -1.0f * dist(gen);//longitudinal shift: R lobe. Suggested value from marschner hair paper between -10 and -5 degrees
+	float beta_r = dist(gen);//longitudinal width (stdev.): R lobe. Suggested value from marschner hair paper between 5 and 10 degrees		
 
 	////////////////////////////////////////////////////////////////////
 	//  HOW THE FOLLOWING STEPS WORK:
@@ -504,14 +518,16 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//rotate towards normal to account for the tilted fiber surface
 		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(2 * alpha_r), tangent));
 
+		//move output ray to cylinders (fibers) local space.
+		/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model*/
+		glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(out_ray), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
+
 		//--------------------------------------------------------------------
 		// M_r(theta_h) : Marschner marginal, longitudinal	scattering function(M)  			
 		//--------------------------------------------------------------------
 
 		//calculate parameters for M
-		float cos_theta_r = glm::dot(glm::normalize(out_ray), normal);
-		float sin_theta_r = glm::dot(glm::normalize(out_ray), tangent);
-		float theta_r = glm::acos(cos_theta_r);//Angle between reflected output ray and fibers normal-plane	
+		float theta_r = std::atan2(out_ray_cyl.x, out_ray_cyl.z);//Angle between reflected output ray and fibers u-w(normal-) plane
 		float theta_h = (theta_r + theta_i) / 2;//theta half angle
 		float theta_d = (theta_r - theta_i) / 2;//theta difference angle
 
@@ -523,8 +539,8 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//--------------------------------------------------------------------
 
 		//calculate parameters for N
-		glm::vec3 out_ray_normplane = glm::normalize(glm::normalize(out_ray) - sin_theta_r * tangent);;//Output lightvector, projected onto the normal-plane
-		float phi = glm::acos(glm::min(1.0f, glm::dot(out_ray_normplane, in_ray_normplane)));
+		float phi_r = std::atan2(std::hypot(out_ray_cyl.x, out_ray_cyl.z), out_ray_cyl.y);
+		float phi = phi_r - phi_i;
 		float h = glm::sin(phi) * -0.5f;//root of the approximation for phi^ in marschner paper (Equation 10) with p = 0
 
 		//From ruenz12 bachelorthesis Equation 44, which derived it from marschner Equation 10.
@@ -577,13 +593,15 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//rotate towards normal to account for the tilted fiber surface
 		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(-alpha_r / 2), t_tangent));
 
+		//move output ray to cylinders (fibers) local space.
+		/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model*/
+		glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(out_ray), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
+
 		//--------------------------------------------------------------------
 		// M_tt(theta_h) : Marschner marginal, longitudinal	scattering function(M)  
 		//--------------------------------------------------------------------
 		//calculate parameters for M
-		float cos_theta_r = glm::dot(glm::normalize(out_ray), t_normal);
-		float sin_theta_r = glm::dot(glm::normalize(out_ray), t_tangent);
-		float theta_r = glm::acos(cos_theta_r);//Angle between reflected output ray and fibers normal-plane	
+		float theta_r = std::atan2(out_ray_cyl.x, out_ray_cyl.z);//Angle between reflected output ray and fibers u-w(normal-) plane
 		float theta_h = (theta_r + theta_i) / 2.f;//theta half angle
 		float theta_d = (theta_r - theta_i) / 2.f;//theta difference angle
 		float gaussian_x = theta_h - glm::radians((-alpha_r / 2.f));//longitudinal shift for TT-Path is smaller than for R-Path
@@ -596,8 +614,8 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//--------------------------------------------------------------------
 
 		//calculate parameters for N
-		glm::vec3 out_ray_normplane = glm::normalize(glm::normalize(out_ray) - sin_theta_r * t_tangent);;//Output lightvector, projected onto the normal-plane
-		float phi = glm::acos(glm::min(1.0f, glm::dot(out_ray_normplane, in_ray_normplane)));
+		float phi_r = std::atan2(std::hypot(out_ray_cyl.x, out_ray_cyl.z), out_ray_cyl.y);
+		float phi = phi_r - phi_i;
 
 
 		//calculation of h from marschner but the concrete equation is from d'Eon paper (Above Equation 9)
@@ -618,16 +636,16 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 
 		//calculate fresnel for attenuation factor
 		float fresnel = BSDFHelper::dialectricFresnel(glm::cos(gamma_i), bravais_first, bravais_sec);
-		if (fresnel == 1.f) fresnel = 0.f;
 
-		//helper variables for attenuation
-		float cos_gamma_t = 2.f * glm::cos(glm::asin(h / bravais_first));
-		glm::vec3 new_sigma = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);//new color absorption coefficient
-		//attenuation factor, which contains color absorbtion
-		glm::vec3 att_color = glm::pow2(1 - fresnel) * glm::exp(new_sigma * cos_gamma_t);
+		//new color absorption coefficient
+		glm::vec3 sigma_a = KIRK::MarschnerHairBSDF::calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
+		//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
+
+		//attenuation factor, which contains color absorbtion. Marschner above Equation 8
+		glm::vec3 att_color = glm::pow2(1 - fresnel) * KIRK::MarschnerHairBSDF::T(sigma_a, glm::asin(h / bravais_first));
 
 		//final term for N_tt(phi). Marschner Equation 8.
-		glm::vec3 n_tt = 0.5f * att_color / glm::abs(2 * dphi_dh);
+		glm::vec3 n_tt = 0.5f * att_color * glm::abs(2 * dphi_dh);
 		
 		//--------------------------------------------------------------------
 
@@ -677,14 +695,16 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//rotate towards normal to account for the tilted fiber surface
 		out_ray = glm::vec3(glm::vec4(out_ray, 0.f) * glm::rotate(glm::radians(-3.f * alpha_r / 2.f), tr_tangent));
 
+		//move output ray to cylinders (fibers) local space.
+		/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model*/
+		glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(out_ray), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
+
 		//--------------------------------------------------------------------
 		// M_trt(theta_h) : Marschner marginal, longitudinal scattering function(M)
 		//--------------------------------------------------------------------
 
 		//calculate parameters for M
-		float cos_theta_r = glm::dot(glm::normalize(out_ray), tr_normal);
-		float sin_theta_r = glm::dot(glm::normalize(out_ray), tr_tangent);
-		float theta_r = glm::acos(cos_theta_r);//Angle between reflected output ray and fibers normal-plane	
+		float theta_r = std::atan2(out_ray_cyl.x, out_ray_cyl.z);//Angle between reflected output ray and fibers u-w(normal-) plane
 		float theta_h = (theta_r + theta_i) / 2.f;//theta half angle
 		float theta_d = (theta_r - theta_i) / 2.f;//theta difference angle
 		float gaussian_x = theta_h - glm::radians((-3 * alpha_r / 2.f));//longitudinal shift for TT-Path is smaller than for R-Path
@@ -697,8 +717,8 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		//--------------------------------------------------------------------
 
 		//calculate parameters for N
-		glm::vec3 out_ray_normplane = glm::normalize(glm::normalize(out_ray) - sin_theta_r * tr_tangent);;//Output lightvector, projected onto the normal-plane
-		float phi = glm::acos(glm::min(1.0f, glm::dot(out_ray_normplane, in_ray_normplane)));
+		float phi_r = std::atan2(std::hypot(out_ray_cyl.x, out_ray_cyl.z), out_ray_cyl.y);
+		float phi = phi_r - phi_i;
 		float w_c = 15.f;//azimuthal width of caustic. Between 10 and 25 degrees
 		float k_g = 2.f;//glint scale factor. Between 0.5 and 5
 		float t, phi_c, h;
@@ -732,15 +752,15 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 
 		//calculate fresnel part of attenuation
 		float fresnel = BSDFHelper::dialectricFresnel(glm::cos(gamma_i), bravais_first, bravais_sec);
-		if (fresnel == 1.f) fresnel = 0.f;
 		float gamma_t = glm::asin(h / bravais_first);
-		float cos_gamma_t = glm::cos(gamma_t);
-		float fresnel_exit = BSDFHelper::dialectricFresnel(cos_gamma_t, 1 / bravais_first, 1 / bravais_sec);
+		float fresnel_exit = BSDFHelper::dialectricFresnel(glm::cos(gamma_t), 1 / bravais_first, 1 / bravais_sec);
 
 		//new color absorption coefficient
-		glm::vec3 new_sigma = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);
+		glm::vec3 sigma_a = KIRK::MarschnerHairBSDF::calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
+		//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
+
 		//full attenuation
-		glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(glm::exp(new_sigma * (2.f * cos_gamma_t)));
+		glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(KIRK::MarschnerHairBSDF::T(sigma_a, gamma_t));
 
 		//calculate gauss values for power apporximation from section 5.2.2
 		float gauss_0 = BSDFHelper::normal_gauss_pdf(0.f, 0.f, w_c);
@@ -754,7 +774,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 		n_trt += t * k_g * att_color * h * (gauss_phi_diff + gauss_phi_sum);
 
 		//--------------------------------------------------------------------
-
+		
 		//return final scattering function
 		scat_trt = m_trt * n_trt / glm::pow2(cos_theta_d);
 	}
@@ -771,7 +791,7 @@ KIRK::Color::RGBA KIRK::CPU::SimpleCPURaytracer::shadeMarschnerHair(Intersection
 	//diffuse part of the color. Similar to Kajiya and Kay lighting
 	//glm::vec4 diffuse = 0.4f * glm::sqrt(1 - sin_theta_i * sin_theta_i) * glm::vec4(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord));
 
-	return directLight * KIRK::Color::RGBA(1000 * scat_r, 1.f) * glm::cos(theta_i);//Scattering Integral. MarschnerPaper Equation 1
+	return directLight * KIRK::Color::RGBA(scat_r, 1.f) * glm::cos(theta_i);//Scattering Integral. MarschnerPaper Equation 1
 
 }
 

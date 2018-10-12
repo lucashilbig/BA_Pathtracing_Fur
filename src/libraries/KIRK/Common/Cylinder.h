@@ -28,9 +28,9 @@ namespace KIRK {
 		float getBaseRadius() const { return m_baseradius; }
 		float getApexRadius() const { return m_apexradius; }
 
-		/*glm::vec3 *getBasePoint() { return &m_basepoint; }
-		glm::vec3 *getApexPoint() { return &m_apexpoint; }		
-		*/
+		glm::vec3 getBasePoint() { return m_basepoint; }
+		glm::vec3 getApexPoint() { return m_apexpoint; }		
+		
 
 	private:
 		void computeBounds() override;//calculates Cylinders BoundingBox in WorldSpace

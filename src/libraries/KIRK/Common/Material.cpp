@@ -2,14 +2,15 @@
 #include "Shading/Bsdf.h"
 #include "Shading/SimpleShader.h"
 #include "Shading/MarschnerHairShader.h"
+#include "Shading/ChiangHairShader.h"
 
 namespace KIRK
 {
 
-    KIRK::Material::Material(std::string name) : KIRK::GuiElement(), name(name), m_bsdf(std::make_shared<BSDF>("LambertianReflectionBSDF", LambertianReflectionBSDF::localSample, LambertianReflectionBSDF::evaluateLight)), m_shader(new SimpleShader("default"))
+    KIRK::Material::Material(std::string name) : KIRK::GuiElement(), name(name), m_bsdf(std::make_shared<BSDF>("LambertianReflectionBSDF", LambertianReflectionBSDF::localSample, LambertianReflectionBSDF::evaluateLight)), m_shader(new SimpleShader("default")), m_current_bsdf(0)
 	{}
 
-	KIRK::Material::Material(std::string name, bool marschnerHair) : KIRK::GuiElement(), name(name), m_bsdf(std::make_shared<BSDF>("MarschnerHairBSDF", MarschnerHairBSDF::localSample, MarschnerHairBSDF::evaluateLight)), m_shader(new MarschnerHairShader("marschnerHair")), m_current_bsdf(6)
+	Material::Material(std::string name, int bsdf) : KIRK::GuiElement(), name(name), m_bsdf(initBSDF(bsdf))
 	{}
 
 	KIRK::Color::RGBA KIRK::Material::getFromParam(const MatParamColor &colorParam, const glm::vec2 &texcoord) const
@@ -22,7 +23,69 @@ namespace KIRK
 		return floatParam.texture ? glm::length(floatParam.texture->getColor(texcoord.x, texcoord.y)) : floatParam.value;
 	}
 
-	
+	std::shared_ptr<KIRK::BSDF> Material::initBSDF(int bsdf)
+	{
+		std::shared_ptr<KIRK::BSDF> bsdf_ptr;
+		int safeBsdf = (bsdf < 0 || bsdf > 8) ? 0 : bsdf;
+		switch (safeBsdf)//set our bsdf
+		{
+		case 0:
+			bsdf_ptr = std::make_shared<BSDF>("LambertianReflectionBSDF",
+				LambertianReflectionBSDF::localSample,
+				LambertianReflectionBSDF::evaluateLight);
+			break;
+		case 1:
+			bsdf_ptr = std::make_shared<BSDF>("SpecularReflectionBSDF", SpecularReflectionBSDF::localSample,
+				SpecularReflectionBSDF::evaluateLight);
+			break;
+		case 2:
+			bsdf_ptr = std::make_shared<BSDF>("GlassBSDF", GlassBSDF::localSample, GlassBSDF::evaluateLight);
+			break;
+		case 3:
+			bsdf_ptr = std::make_shared<BSDF>("LambertianTransmissionBSDF",
+				LambertianTransmissionBSDF::localSample,
+				LambertianTransmissionBSDF::evaluateLight);
+			break;
+		case 4:
+			bsdf_ptr = std::make_shared<BSDF>("EmissionBSDF", EmissionBSDF::localSample,
+				EmissionBSDF::evaluateLight);
+			break;
+		case 5:
+			bsdf_ptr = std::make_shared<BSDF>("TransparentBSDF", TransparentBSDF::localSample,
+				TransparentBSDF::evaluateLight);
+			break;
+		case 6:
+			bsdf_ptr = std::make_shared<BSDF>("MarschnerHairBSDF", MarschnerHairBSDF::localSample,
+				MarschnerHairBSDF::evaluateLight);
+			break;
+		case 7:
+			bsdf_ptr = std::make_shared<BSDF>("DEonHairBSDF", DEonHairBSDF::localSample,
+				DEonHairBSDF::evaluateLight);
+			break;
+		case 8:
+			bsdf_ptr = std::make_shared<BSDF>("ChiangHairBSDF", ChiangHairBSDF::localSample,
+				ChiangHairBSDF::evaluateLight);
+			break;
+		default:
+			bsdf_ptr = std::make_shared<BSDF>("LambertianReflectionBSDF",
+				LambertianReflectionBSDF::localSample,
+				LambertianReflectionBSDF::evaluateLight);
+			break;
+		}
+
+		//set the shader which needs to be used for the selected bsdf
+		if (safeBsdf >= 0 && safeBsdf < 6)
+			m_shader = KIRK::ShaderFactory::getInstance().getShader("SimpleShader");
+		else if (safeBsdf == 6 || safeBsdf == 7)
+			m_shader = KIRK::ShaderFactory::getInstance().getShader("MarschnerHairShader");
+		else if (safeBsdf == 8)
+			m_shader = KIRK::ShaderFactory::getInstance().getShader("ChiangHairShader");
+
+		m_current_bsdf = safeBsdf;
+		//finaly return our bsdf
+		return bsdf_ptr;
+	}
+		
 	void imguicolor(const char* name, KIRK::Color::RGBA *color)
 	{
 		float dc[4] = { color->r, color->g, color->b, color->a };
@@ -39,47 +102,42 @@ namespace KIRK
             ImGui::PushID(("mat_id_" + name).c_str());
 
             int oldcb = m_current_bsdf;
-            const char *names[] = {"Diffuse", "Glossy", "Glass", "Translucent", "Emission", "Transparent", "MarschnerHair", "DEonHair"};
-            ImGui::Combo("BSDF", &m_current_bsdf, names, 8);
+            const char *names[] = {"Diffuse", "Glossy", "Glass", "Translucent", "Emission", "Transparent", "MarschnerHair", "DEonHair", "ChiangHair" };
+            ImGui::Combo("BSDF", &m_current_bsdf, names, 9);
 
             if(m_current_bsdf != oldcb)
             {
                 switch(m_current_bsdf)
                 {
                     case 0:
-                        m_bsdf = std::make_shared<BSDF>("LambertianReflectionBSDF",
-                                                        LambertianReflectionBSDF::localSample,
-                                                        LambertianReflectionBSDF::evaluateLight);
+                        m_bsdf = initBSDF(0);
                         break;
                     case 1:
-                        m_bsdf = std::make_shared<BSDF>("SpecularReflectionBSDF", SpecularReflectionBSDF::localSample,
-                                                        SpecularReflectionBSDF::evaluateLight);
+                        m_bsdf = initBSDF(1);
                         break;
                     case 2:
-                        m_bsdf = std::make_shared<BSDF>("GlassBSDF", GlassBSDF::localSample, GlassBSDF::evaluateLight);
+                        m_bsdf = initBSDF(2);
                         break;
                     case 3:
-                        m_bsdf = std::make_shared<BSDF>("LambertianTransmissionBSDF",
-                                                        LambertianTransmissionBSDF::localSample,
-                                                        LambertianTransmissionBSDF::evaluateLight);
+                        m_bsdf = initBSDF(3);
                         break;
                     case 4:
-                        m_bsdf = std::make_shared<BSDF>("EmissionBSDF", EmissionBSDF::localSample,
-                                                        EmissionBSDF::evaluateLight);
+                        m_bsdf = initBSDF(4);
                         break;
                     case 5:
-                        m_bsdf = std::make_shared<BSDF>("TransparentBSDF", TransparentBSDF::localSample,
-                                                        TransparentBSDF::evaluateLight);
+                        m_bsdf = initBSDF(5);
                         break;
 					case 6:
-						m_bsdf = std::make_shared<BSDF>("MarschnerHairBSDF", MarschnerHairBSDF::localSample,
-							MarschnerHairBSDF::evaluateLight);
+						m_bsdf = initBSDF(6);
 						break;
 					case 7:
-						m_bsdf = std::make_shared<BSDF>("DEonHairBSDF", DEonHairBSDF::localSample,
-							DEonHairBSDF::evaluateLight);
+						m_bsdf = initBSDF(7);
+						break;
+					case 8:
+						m_bsdf = initBSDF(8);
 						break;
                     default:
+						m_bsdf = initBSDF(0);
                         break;
                 }
             }
@@ -155,4 +213,5 @@ namespace KIRK
 			return os << "Well ... seems like there is no material :/" << std::endl;
 		}
 	}
+	
 }
