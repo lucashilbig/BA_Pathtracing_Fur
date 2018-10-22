@@ -30,8 +30,15 @@ namespace KIRK {
 
 	inline void MarschnerHairShader::shade(KIRK::CPU::PathTracer& pathtracer, const KIRK::Intersection& hit, KIRK::CPU::Bounce& resultBounce, KIRK::Ray& resultRay)
 	{
+		//Cast Object to cylinder
+		KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
+
+		//if we have no cylinder as Object we return
+		if (cylinder_obj == NULL)
+			return;
+
 		glm::vec3 input_ray_normalized = normalize(resultRay.m_direction);
-		Material* material = hit.m_object->getMaterial();
+		Material* material = hit.m_object->getMaterial();		
 		std::shared_ptr<BSDF> bsdf = material->m_bsdf;
 		glm::vec2 sample(0.f);
 
@@ -43,6 +50,9 @@ namespace KIRK {
 		float pdf_tt; //probability distribution function for TT-Path
 		float pdf_trt; //probability distribution function for TRT-Path	
 		float pdf; //Combined probability distribution function
+
+		//Calculate mean of the fibers diameter. Diameter is (2 * radius) and convertion from centimeter in micrometer is (* 10000), hence (* 20000)
+		float fiber_width = 20000 * ((cylinder_obj->getBaseRadius() + cylinder_obj->getApexRadius()) / 2);
 
 		//random uniform distribution for lobe alpha shift and beta width. We calculate it here not in the bsdf so we have the same value for every path in the lobe.
 		std::uniform_real_distribution<float> dist(5.0f, std::nextafter(10.0f, DBL_MAX));//std::nextafter so we get the [5,10] interval instead of [5,10)
@@ -59,8 +69,8 @@ namespace KIRK {
 		//Select one random light source from all lights
 		int lightIndex = m_dist(m_gen) * pathtracer.getScene().getLights().size();
 		auto light = pathtracer.getScene().getLights()[lightIndex].get();
-		float attenuation;		
-		
+		float attenuation;
+
 		//////////////////////////////////////////////
 		//  R-PATH: Scattered Light calculation (RGB)
 		//////////////////////////////////////////////
@@ -71,7 +81,7 @@ namespace KIRK {
 		result_direction_r = hitToLight.m_direction;
 
 		// Sample bsdf for r-path
-		glm::vec3 scattering_r = bsdf->sample(hit, input_ray_normalized, hit.m_normal, result_direction_r, pdf_r, resultBounce.mat_flags, sample); 
+		glm::vec3 scattering_r = bsdf->sample(hit, input_ray_normalized, hit.m_normal, result_direction_r, pdf_r, resultBounce.mat_flags, sample);
 
 		//////////////////////////////////////////////
 		//  TT-PATH: Scattered Light calculation (RGB)
@@ -81,7 +91,7 @@ namespace KIRK {
 		glm::vec3 t_dir = glm::refract(input_ray_normalized, glm::faceforward(hit.m_normal, input_ray_normalized, hit.m_normal), 1.0f / material->m_ior);
 		glm::vec3 t_normal;
 		Intersection t_hit(Ray(hit.m_location + 1e-4f * t_dir, t_dir));
-		
+
 		//get the intersection point on the second wall
 		if (pathtracer.getScene().getDataStructure().closestIntersection(&t_hit))
 		{
@@ -102,7 +112,7 @@ namespace KIRK {
 		//set the material flags to TT-Path
 		resultBounce.mat_flags = BSDFHelper::MATFLAG_CYLINDER_T_BOUNCE;
 		// Sample bsdf for tt-path
-		glm::vec3 scattering_tt = bsdf->sample(t_hit, input_ray_normalized, t_normal, result_direction_tt, pdf_tt, resultBounce.mat_flags, sample); 
+		glm::vec3 scattering_tt = bsdf->sample(t_hit, input_ray_normalized, t_normal, result_direction_tt, pdf_tt, resultBounce.mat_flags, sample);
 
 		//////////////////////////////////////////////
 		//  TRT-PATH: Scattered Light calculation (RGB)
@@ -144,42 +154,46 @@ namespace KIRK {
 
 		//decide which direction we follow randomly
 		std::uniform_int_distribution<> dis(0, 2);
-		switch (dis(m_gen)) 
+		//int path = dis(m_gen);
+		int path = 0;
+		if (path == 0)//we take R-Path as outgoing direction
 		{
-		case 0: result_direction = result_direction_r; break;//we take R-Path as outgoing direction
-		case 1: result_direction = result_direction_tt; break;//we take TT-Path as outgoing direction
-		case 2: result_direction = result_direction_trt; break;//we take TRT-Path as outgoing direction
+			resultRay = KIRK::Ray(hit.m_location + 1e-4f * result_direction_r, result_direction_r);
+		}
+		else if (path == 1)//we take TT-Path as outgoing direction
+		{
+
+			resultRay = KIRK::Ray(t_hit.m_location + 1e-4f * result_direction_tt, result_direction_tt);
+		}
+		else//we take TRT-Path as outgoing direction
+		{
+
+			resultRay = KIRK::Ray(tr_hit.m_location + 1e-4f * result_direction_trt, result_direction_trt);
 		}
 		
-		//New Ray to follow
-		resultRay = KIRK::Ray(hit.m_location + 1e-4f * result_direction, result_direction);//offset for new ray, so it doesnt hit the same object directly again
+		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
+		if ((scattering_r + scattering_tt + scattering_trt) == glm::vec3(0.f) || pdf <= 1E-4f
+			|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
+			resultBounce.radiance = glm::vec3(0);
+		else//Render-Equation (Marschner Equation 1). Theta_i is stored in sample.x and pdf is to account for radiance fallof
+			resultBounce.radiance *= glm::min((scattering_r * 100) * fiber_width * glm::abs(glm::cos(sample.x)) / pdf, 1.0f);
+
 
 		//Color vectors
 		Color::RGBA accumulatedColor(0.0f);
 		Color::RGBA ambientLight;
 		Color::RGBA directLight;
-
-		//Ambient light
-		//ambientLight = pathtracer.getScene().getEnvironment().getAmbientLight() * glm::vec4(bsdf->evaluateLight(hit, hit.m_normal, hit.m_normal) * glm::one_over_pi<float>(), 1.0f);
-		//accumulatedColor += ambientLight * glm::vec4(resultBounce.radiance, 1.0f);
 		
+		//Ambient light
+		ambientLight = pathtracer.getScene().getEnvironment().getAmbientLight() * glm::vec4(bsdf->evaluateLight(hit, hit.m_normal, hit.m_normal) * glm::one_over_pi<float>(), 1.0f);
+		accumulatedColor += ambientLight * glm::vec4(resultBounce.radiance, 1.0f);
+
 		//Calculate direct Light from all light Sources. 
 		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());
 		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);//add direct light to color
 		
-
-		resultBounce.bounce_count++;
-
-		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
-		if ((scattering_r + scattering_tt + scattering_trt) == glm::vec3(0.f) || pdf <= 1E-4f 
-			|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
-			resultBounce.radiance = glm::vec3(0);
-		else
-			resultBounce.radiance *= glm::min((scattering_r) / pdf, 1.0f);//Render-Equation. Theta_i is stored in sample.x and pdf is to account for radiance fallof
-		
-
-		resultBounce.color += accumulatedColor * glm::abs(glm::cos(sample.x));
-		//resultBounce.color = glm::min(resultBounce.color, 1.f);
+		//Add new color to bounce
+		resultBounce.color += accumulatedColor;
 
 	}
 
@@ -202,7 +216,7 @@ namespace KIRK {
 		glm::vec3 lightpos = hitToLight.m_origin + hitToLight.m_direction;
 		hitToLight.m_origin += 1e-4f * glm::faceforward(hit.m_normal, hitToLight.m_origin - lightpos, hit.m_normal);
 		hitToLight.m_direction = glm::normalize(hitToLight.m_direction);
-		
+
 		auto lightColor = light->m_color;
 
 		if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)

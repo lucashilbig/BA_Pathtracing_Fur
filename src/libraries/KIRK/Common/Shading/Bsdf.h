@@ -120,6 +120,14 @@ public:
 	static glm::vec3 uniformSphereSample(float u, float v);
 	static float dialectricFresnel (const float cos_theta, float eta_i, float eta_t);
 
+	/**
+	* @brief Turns theta angle calculated with atan2 (Value range [-pi, pi]) to the 
+	* value range [-pi/2, pi/2] needed for the theta angle in marschner paper
+	* @param theta. Theta angle from atan2 in radians.
+	* @return Theta angle in range [-pi/2, pi/2] radians.
+	*/
+	static float atan2ThetaToMarschner(const float theta);
+
 private:
 	//=============================================================================
 	// _root3, root3 from http://prografix.narod.ru

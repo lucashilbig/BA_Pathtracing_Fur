@@ -195,7 +195,7 @@ float PointLight::angularAttenuation(const glm::vec3 dir) const
 
 glm::vec3 PointLight::sampleLightSource(const glm::vec3 dir, const glm::vec3 origin, const float t) const
 {
-	return glm::one_over_pi<float>() * glm::vec3(m_color) / (m_const > 0 ? m_const : 1);
+	return glm::min(glm::one_over_pi<float>() * glm::vec3(m_color) / (m_const > 0 ? m_const : 1), 1.0f);
 }
 
 void PointLight::onGui()
@@ -235,7 +235,7 @@ glm::vec3 QuadLight::sampleLightSource(const glm::vec3 dir, const glm::vec3 orig
 {
 	float dirDotDir = glm::dot(glm::normalize(-dir), m_direction) < 0 ? 0 : 1;
 
-	return glm::one_over_pi<float>() * dirDotDir * glm::vec3(m_color) / (m_const > 0 ? m_const : 1);
+	return glm::min(glm::one_over_pi<float>() * dirDotDir * glm::vec3(m_color) / (m_const > 0 ? m_const : 1), 1.f);
 }
 
 void QuadLight::onGui()
@@ -436,7 +436,7 @@ float SpotLight::angularAttenuation(const glm::vec3 dir) const
 glm::vec3 SpotLight::sampleLightSource(const glm::vec3 dir, const glm::vec3 origin, const float t) const
 {
 	float dirDotDir = glm::dot(glm::normalize(-dir), m_direction) < 0.0f ? 0.0f : 1.0f;
-	return glm::one_over_pi<float>() * dirDotDir * glm::vec3(m_color) / (m_const > 0 ? m_const : 1);
+	return glm::min(glm::one_over_pi<float>() * dirDotDir * glm::vec3(m_color) / (m_const > 0 ? m_const : 1), 1.0f);
 }
 
 void SpotLight::onGui()

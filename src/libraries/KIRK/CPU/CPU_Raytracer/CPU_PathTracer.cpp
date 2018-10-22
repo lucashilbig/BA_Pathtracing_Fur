@@ -67,7 +67,10 @@ namespace KIRK {
 
 				if (c_sample == 0)
 				{
-					m_textureBuffer[bufferIndex] = m_bounceBuffer[segmentIndex].color;
+					auto color = m_bounceBuffer[segmentIndex].color;
+					m_textureBuffer[bufferIndex] = color;
+					if (color.x >= 1.f)
+						float test = 1;
 				}
 				else
 				{
@@ -112,7 +115,6 @@ namespace KIRK {
 				int segmentIndex = m_bufferSegmentation.get1DSegmentIndex(x, y);
 				m_bounceBuffer[segmentIndex].radiance = glm::vec3(1.f);
 				m_bounceBuffer[segmentIndex].color = glm::vec4(0.f);
-				m_bounceBuffer[segmentIndex].bounce_count = 0;
 				m_bounceBuffer[segmentIndex].mat_flags = 0;
 			}, m_num_threads, m_use_progress_bar);
 		}

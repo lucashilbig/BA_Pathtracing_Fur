@@ -118,7 +118,7 @@ void KIRK::Mesh::addFurToFaces(unsigned int fibers_per_face, unsigned int num_fi
 			float radius = fiber_radius;
 			furFace.fiber_radius.push_back(radius);
 			//offset for the z-axis position
-			float offset_z = 0.2f;
+			float offset_z = 0.2f;//0.2
 
 			//add positions for a single fiber
 			for (int i = num_fiber_verts; i > 1; i--) {
@@ -139,7 +139,7 @@ void KIRK::Mesh::addFurToFaces(unsigned int fibers_per_face, unsigned int num_fi
 			}
 			//Add last vertice with radius of 0 at the end of the fiber
 			//furFace.fiber_positions.push_back(pos + glm::vec3(0.0f, 0.003f, 0.01f));
-			furFace.fiber_radius[furFace.fiber_radius.size() - 1] = 0.0001f;
+			furFace.fiber_radius[furFace.fiber_radius.size() - 1] = 0.0005f;
 
 			//Add new furFace to m_furFaces member
 			m_furFibers.push_back(furFace);

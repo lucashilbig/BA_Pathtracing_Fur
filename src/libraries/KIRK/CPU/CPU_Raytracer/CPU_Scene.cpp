@@ -113,7 +113,7 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 					glm::mat4 transform = base_transform * child->m_transform;
 					//Material for fur fibers with marschnerHairBSDF and -Shader
 					std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat", 6);//Boolean to call the constructor which uses MarschnerHairBsdf and -Shader
-					mat->m_diffuse.value = KIRK::Color::RGBA(0.545f, 0.353f, 0.169f, 1.0f);//Brown color 0.545f, 0.353f, 0.169f
+					mat->m_diffuse.value = KIRK::Color::RGBA(0.43f, 0.353f, 0.2f, 1.0f);//Brown color 0.43f, 0.353f, 0.2f. Sigma_value for blond hair: 0.21f, 0.34f, 0.98f
 					mat->m_ior = 1.55f;//suggested value from marschner hair paper
 					//mat->m_hairBSDF = std::make_shared<ChiangHairBSDF>();
 					m_materials.push_back(mat);
@@ -131,9 +131,9 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 							glm::vec3 apexpos = fiber->fiber_positions[c + 1];
 							float baseradius = fiber->fiber_radius[c];
 							//move base position a bit to hide cone edges in the fiber struct
-							basepos -= 0.008f * (apexpos - basepos);
+							basepos -= 0.001f * (apexpos - basepos);
 							//lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
-							baseradius -= (c > 3) ? 0.1f * baseradius : 0.05f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
+							baseradius -= 0.02f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
 							//create raytracing cylinder object
 							KIRK::Cylinder *obj = new KIRK::Cylinder(basepos, apexpos,
 								baseradius, fiber->fiber_radius[c + 1], &transform);

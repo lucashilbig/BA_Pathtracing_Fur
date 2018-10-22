@@ -167,6 +167,11 @@ void charCallback(GLFWwindow *window, unsigned int key)
 		m_is_raytracer_active = false;
 		LOG_INFO("Stopped Rendering");
 		break;
+	case 'z'://stop rendering
+		m_is_raytracer_active = false;
+		cpu_pathtracer->reset();
+		LOG_INFO("Stopped Rendering");
+		break;
 	case '0'://switch to OpenGL mode
 		m_platform_used = 0;
 		break;
@@ -205,6 +210,7 @@ int main(int argc, char *argv[])
 	//CAUTION: Cannot use any const here. So no const char* allowed.
 	//Not important to have optimized const char*'s here for appending RESOURCES_PATH, all this is kind of temporary.
 	std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/scene.json"));
+	//std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Bunny/scene.json"));
 	std::string relative_path = arg_map.get('s', std::string(""));
 	unsigned int image_width = arg_map.get('w', 1280);
 	unsigned int image_height = arg_map.get('h', 720);
@@ -217,7 +223,7 @@ int main(int argc, char *argv[])
 
 	//Load up scene.
 	std::shared_ptr<KIRK::SceneGraph> scene(KIRK::SceneGraph::makeSceneGraph(file));
-
+	
 
 	//Initializing environment map (cubeMap here)
 	/*scene->getEnvironment()->loadCubeMap(RESOURCES_PATH "/cubeMap/posx.jpg",
@@ -232,8 +238,8 @@ int main(int argc, char *argv[])
 
 	//Apply fur on every triangle in the scene. For testing purpose.
 	
-	scene->addFurFibersToAllMeshes(5, 10, 0.004f);//0.004f
-	
+	//scene->addFurFibersToAllMeshes(1, 4, 0.002f);//Bunny
+	scene->addFurFibersToAllMeshes(5, 10, 0.005f);//Hair plane
 
 	//////////////////////////////////////////////
 	//
