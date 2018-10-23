@@ -111,7 +111,7 @@ void KIRK::Mesh::addFurToFaces(unsigned int fibers_per_face, unsigned int num_fi
 			//compute fiber start position 
 			glm::vec3 pos = a + r1 * (b - a) + r2 * (c - a);
 			//move start position down, otherwise the bottom cylinder will stick out of the ground
-			pos.y -= 0.003f;
+			pos.y -= 0.004f;
 			//Add fiber start position
 			furFace.fiber_positions.push_back(pos);
 			//Add radius for start position

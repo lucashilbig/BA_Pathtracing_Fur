@@ -102,7 +102,7 @@ namespace KIRK
             ImGui::PushID(("mat_id_" + name).c_str());
 
             int oldcb = m_current_bsdf;
-            const char *names[] = {"Diffuse", "Glossy", "Glass", "Translucent", "Emission", "Transparent", "MarschnerHair", "DEonHair", "ChiangHair" };
+            const char *names[] = {"Diffuse", "Specular", "Glass", "Translucent", "Emission", "Transparent", "MarschnerHair", "DEonHair", "ChiangHair" };
             ImGui::Combo("BSDF", &m_current_bsdf, names, 9);
 
             if(m_current_bsdf != oldcb)

@@ -33,12 +33,18 @@ namespace KIRK {
 		//Cast Object to cylinder
 		KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
 
+		//Diameter of the fiber
+		float fiber_width;
+
 		//if we have no cylinder as Object we return
 		if (cylinder_obj == NULL)
-			return;
+			fiber_width = 100.f;
+		else
+			//Calculate mean of the fibers diameter. Diameter is (2 * radius) and convertion from centimeter in micrometer is (* 10000), hence (* 20000)
+			fiber_width = 20000 * ((cylinder_obj->getBaseRadius() + cylinder_obj->getApexRadius()) / 2);
 
 		glm::vec3 input_ray_normalized = normalize(resultRay.m_direction);
-		Material* material = hit.m_object->getMaterial();		
+		Material* material = hit.m_object->getMaterial();
 		std::shared_ptr<BSDF> bsdf = material->m_bsdf;
 		glm::vec2 sample(0.f);
 
@@ -50,9 +56,6 @@ namespace KIRK {
 		float pdf_tt; //probability distribution function for TT-Path
 		float pdf_trt; //probability distribution function for TRT-Path	
 		float pdf; //Combined probability distribution function
-
-		//Calculate mean of the fibers diameter. Diameter is (2 * radius) and convertion from centimeter in micrometer is (* 10000), hence (* 20000)
-		float fiber_width = 20000 * ((cylinder_obj->getBaseRadius() + cylinder_obj->getApexRadius()) / 2);
 
 		//random uniform distribution for lobe alpha shift and beta width. We calculate it here not in the bsdf so we have the same value for every path in the lobe.
 		std::uniform_real_distribution<float> dist(5.0f, std::nextafter(10.0f, DBL_MAX));//std::nextafter so we get the [5,10] interval instead of [5,10)
@@ -156,6 +159,7 @@ namespace KIRK {
 		std::uniform_int_distribution<> dis(0, 2);
 		//int path = dis(m_gen);
 		int path = 0;
+		resultBounce.mat_flags = BSDFHelper::MATFLAG_SPECULAR_BOUNCE;
 		if (path == 0)//we take R-Path as outgoing direction
 		{
 			resultRay = KIRK::Ray(hit.m_location + 1e-4f * result_direction_r, result_direction_r);
@@ -170,20 +174,20 @@ namespace KIRK {
 
 			resultRay = KIRK::Ray(tr_hit.m_location + 1e-4f * result_direction_trt, result_direction_trt);
 		}
-		
+
 		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
 		if ((scattering_r + scattering_tt + scattering_trt) == glm::vec3(0.f) || pdf <= 1E-4f
 			|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 			resultBounce.radiance = glm::vec3(0);
 		else//Render-Equation (Marschner Equation 1). Theta_i is stored in sample.x and pdf is to account for radiance fallof
-			resultBounce.radiance *= glm::min((scattering_r * 100) * fiber_width * glm::abs(glm::cos(sample.x)) / pdf, 1.0f);
+			resultBounce.radiance *= glm::min((scattering_r*1000) * fiber_width * glm::abs(glm::cos(sample.x)) / pdf, 1.0f);
 
 
 		//Color vectors
 		Color::RGBA accumulatedColor(0.0f);
 		Color::RGBA ambientLight;
 		Color::RGBA directLight;
-		
+
 		//Ambient light
 		ambientLight = pathtracer.getScene().getEnvironment().getAmbientLight() * glm::vec4(bsdf->evaluateLight(hit, hit.m_normal, hit.m_normal) * glm::one_over_pi<float>(), 1.0f);
 		accumulatedColor += ambientLight * glm::vec4(resultBounce.radiance, 1.0f);
@@ -191,9 +195,9 @@ namespace KIRK {
 		//Calculate direct Light from all light Sources. 
 		directLight = calcDirectLight(pathtracer, hit, pathtracer.getSampler().sample2D());
 		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);//add direct light to color
-		
+
 		//Add new color to bounce
-		resultBounce.color += accumulatedColor;
+		resultBounce.color += accumulatedColor;//KIRK::Color::RGBA(result_direction_r, 1.f);
 
 	}
 

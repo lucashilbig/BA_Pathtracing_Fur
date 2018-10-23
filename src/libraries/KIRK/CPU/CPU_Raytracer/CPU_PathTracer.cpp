@@ -67,10 +67,7 @@ namespace KIRK {
 
 				if (c_sample == 0)
 				{
-					auto color = m_bounceBuffer[segmentIndex].color;
-					m_textureBuffer[bufferIndex] = color;
-					if (color.x >= 1.f)
-						float test = 1;
+					m_textureBuffer[bufferIndex] = m_bounceBuffer[segmentIndex].color;
 				}
 				else
 				{

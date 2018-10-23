@@ -308,8 +308,13 @@ namespace CVK
 						//calculate translation vector. Since our geometry is created at the position of the first fiber in our mesh 
 						//we have to use the difference between the first fiber and the current fiber. Also we only need to use the start positions of the fiber.
 						glm::vec3 trans_vec = mesh.m_furFibers[i].fiber_positions[0] - mesh.m_furFibers[0].fiber_positions[0];
+
 						//Now calculate the actual transformation matrix with the meshes matrix as base and our translation vector on top of that
 						glm::mat4 trans_mat = glm::translate(transform, trans_vec);
+
+						//Scale down to comprehend big cylinder radius(needed cause they dont work properly with radius < 0.1)
+						// trans_mat *= glm::scale(glm::vec3(0.05f, 0.05f, 0.05f));
+						
 						//set transformation matrix for current fiber
 						fiber_inst_node->setModelMatrix(trans_mat);
 						//Push node to all other scene nodes

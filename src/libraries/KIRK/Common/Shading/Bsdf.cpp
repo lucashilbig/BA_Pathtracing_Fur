@@ -301,7 +301,12 @@ namespace KIRK {
 		return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) / glm::abs(glm::dot(local_output_ray, normal));
 	}
 
-	glm::vec3 SpecularReflectionBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) { return glm::vec3(.0f); }
+	glm::vec3 SpecularReflectionBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray) 
+	{
+		/*bool reflect = glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0;
+		if (reflect) { return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) * glm::one_over_pi <float>(); }*/
+		return glm::vec3(0);
+	}
 
 	////////////////////////////////////////////////////////////////////////////////////
 	//////////////
@@ -549,26 +554,44 @@ namespace KIRK {
 
 	glm::vec3 MarschnerHairBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 	{
+		/* Not need atm, because we calculate cylindric uvw axis for triangle in the cpu_scene convertion method
 		//Cast Object to cylinder
-		KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
-
-		//if we have no cylinder as Object we return 0
+		KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);		
+		
 		if (cylinder_obj == NULL)
-			return glm::vec3(0.f);
+		{
+			//calculation of tangent vector, which will be the local u-axis
+			glm::vec3 c1 = glm::cross(normal, glm::vec3(0.0, 0.0, 1.0));
+			glm::vec3 c2 = glm::cross(normal, glm::vec3(0.0, 1.0, 0.0));
+
+			u_axis = (glm::length(c1) > glm::length(c2)) ? glm::normalize(c1) : glm::normalize(c2);
+			v_axis = normal;
+			w_axis = glm::normalize(glm::cross(u_axis, v_axis));
+		}
+		else
+		{
+			//  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model
+			//and we used the local_output_ray to store our ray towards the light source we want to sample
+			u_axis = cylinder_obj->getV();
+			v_axis = cylinder_obj->getU();
+			w_axis = cylinder_obj->getW();
+		}*/
+
+		//objects local axis
+		glm::vec3 u_axis = hit.m_object->getV();
+		glm::vec3 v_axis = hit.m_object->getU();
+		glm::vec3 w_axis = hit.m_object->getW();
 
 		//needed parameters
 		Material* material = hit.m_object->getMaterial();
 		glm::vec2 texcoord = hit.m_texcoord;
 
-		//calculation of tangent vector
-		glm::vec3 c1 = glm::cross(normal, glm::vec3(0.0, 0.0, 1.0));
-		glm::vec3 c2 = glm::cross(normal, glm::vec3(0.0, 1.0, 0.0));
-		glm::vec3 tangent = (glm::length(c1) > glm::length(c2)) ? glm::normalize(c1) : glm::normalize(c2);
+		//If we accidently hit an object without hair bsdf we can return
+		if (material->m_current_bsdf < 6 || material->m_current_bsdf > 8)
+			return glm::vec3(0);
 
-		//move light ray to cylinders (fibers) local space.
-		/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model
-			and we used the local_output_ray to store our ray towards the light source we want to sample*/
-		glm::vec3 hit_to_light = -Math::worldToLocal(glm::normalize(local_output_ray), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
+		//move light ray to cylinders (fibers) local space.		
+		glm::vec3 hit_to_light = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
 		//calculate spherical coordinates of light ray. NOTE: std::atan2 is atan(y/x) using the signs of arguments to determine the correct quadrant. range [-pi, pi], so we wrap it to marschner range [-pi/2, pi/2]
 		float theta_i = BSDFHelper::atan2ThetaToMarschner(std::atan2(hit_to_light.x, hit_to_light.z));//Angle between light ray and fibers v-w(normal-)plane(Inclinations with respect of the fibers normalplane). Around v-axis
@@ -586,14 +609,13 @@ namespace KIRK {
 			local_output_ray = glm::refract(local_input_ray, glm::faceforward(normal, local_input_ray, normal), 1.f / material->m_ior);
 
 			//rotate towards normal to account for the tilted fiber surface
-			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-alpha_r / 2), tangent));
+			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-alpha_r / 2), u_axis));
 
 			//reset material flags and set it to finished path since we leave the cylinder
 			mat_flags = 0;
 
 			//move output ray to cylinders (fibers) local space.
-			/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model*/
-			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
+			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
 			//--------------------------------------------------------------------
 			// M_tt(theta_h) : Marschner marginal, longitudinal	scattering function(M)  
@@ -660,14 +682,13 @@ namespace KIRK {
 			local_output_ray = glm::refract(local_input_ray, glm::faceforward(normal, local_input_ray, normal), 1.f);
 
 			//rotate towards normal to account for the tilted fiber surface
-			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-3.f * alpha_r / 2.f), tangent));
+			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-3.f * alpha_r / 2.f), u_axis));
 
 			//reset material flags and set it to finished path since we leave the cylinder
 			mat_flags = 0;
 
 			//move output ray to cylinders (fibers) local space.
-			/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model*/
-			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
+			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
 			//--------------------------------------------------------------------
 			// M_trt(theta_h) : Marschner marginal, longitudinal	scattering function(M)  
@@ -767,13 +788,13 @@ namespace KIRK {
 			//reflect input ray on the surface
 			local_output_ray = glm::reflect(local_input_ray, glm::faceforward(normal, local_input_ray, normal));
 			//rotate towards normal to account for the tilted fiber surface
-			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(alpha_r), tangent));
+			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(alpha_r), u_axis));
 			//Reset the mat_flags and set it to finished path since we leave the cylinder
 			mat_flags = BSDFHelper::MATFLAG_SPECULAR_BOUNCE;
 
 			//move output ray to cylinders (fibers) local space.
 			/*  Our v-axis(vector through the center of the cylinder(apexpoint - basepoint)) is u-axis in marschner model*/
-			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), cylinder_obj->getV(), cylinder_obj->getU(), cylinder_obj->getW());
+			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
 			//--------------------------------------------------------------------
 			// M_r(theta_h) : Marschner marginal, longitudinal	scattering function(M)  			
@@ -811,7 +832,8 @@ namespace KIRK {
 			float bravais_sec = glm::pow2(material->m_ior) * cos_theta_d / x1;//second bravais index (virtual eta)
 
 			//calculate attenuation factor with fresnel
-			float fresnel = BSDFHelper::dialectricFresnel(glm::cos(glm::asin(h)), bravais_first, bravais_sec);
+			//float fresnel = BSDFHelper::dialectricFresnel(glm::cos(glm::asin(h)), bravais_first, bravais_sec);
+			float fresnel = BSDFHelper::dialectricFresnel(glm::dot(local_input_ray, hit.m_normal), bravais_first, bravais_sec);
 
 			//final term for N_r(phi). Marschner Equation 8
 			float n_r = 0.5f * fresnel / glm::abs(2 * dphi_dh);
@@ -820,12 +842,13 @@ namespace KIRK {
 
 			//Final value for the combined scattering function
 			float scatt_func = output_pdf * n_r / glm::pow2(cos_theta_d);
+			return glm::vec3(scatt_func);
 
-			//If we have a reflection(Both vectors are in positiv hemisphere) we return our scat value
+			/*//If we have a reflection(Both vectors are in positiv hemisphere) we return our scat value
 			if ((glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0))
 				return glm::vec3(scatt_func);
 			else
-				return glm::vec3(0.f);
+				return glm::vec3(0.f);*/
 		}
 		return glm::vec3(.0f);
 	}
@@ -834,6 +857,7 @@ namespace KIRK {
 	{
 		//Normally we would check if we really have an reflection or refraction, but since we dont know if we have to check for R, TT or TRT
 		//Path we do this directly in the sample_bsdf function
+		return glm::vec3(0);
 		return glm::vec3(1.f) * glm::one_over_pi <float>();
 	}
 

@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
 	//Apply fur on every triangle in the scene. For testing purpose.
 	
 	//scene->addFurFibersToAllMeshes(1, 4, 0.002f);//Bunny
-	scene->addFurFibersToAllMeshes(5, 10, 0.005f);//Hair plane
+	scene->addFurFibersToAllMeshes(3, 10, 0.005f);//Hair plane
 
 	//////////////////////////////////////////////
 	//
@@ -270,8 +270,7 @@ int main(int argc, char *argv[])
 
 	//Initialize the cpu_scene with BVH Datastructure
 	auto cpu_scene = std::make_shared<KIRK::CPU::Scene>(scene, std::unique_ptr<KIRK::CPU::CPU_DataStructure>(std::make_unique<KIRK::CPU::BVH>()), true);
-
-
+	
 	//Initialize the CPU raytracers
 	cpu_raytracer->init(cpu_scene);
 	cpu_pathtracer->init(cpu_scene);
