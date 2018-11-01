@@ -71,15 +71,12 @@ namespace KIRK {
 				}
 				else
 				{
-					//m_textureBuffer[bufferIndex] += (m_bounceBuffer[segmentIndex].color - m_textureBuffer[bufferIndex]) / (c_sample + 1);
+					m_textureBuffer[bufferIndex] += (m_bounceBuffer[segmentIndex].color - m_textureBuffer[bufferIndex]) / (c_sample + 1);
 					//Alternative, yields same results.
-					m_textureBuffer[bufferIndex] = m_textureBuffer[bufferIndex] * (c_sample / static_cast <float>(c_sample + 1));
-					m_textureBuffer[bufferIndex] += (1 / static_cast <float>(c_sample + 1)) * m_bounceBuffer[segmentIndex].color;
+					//m_textureBuffer[bufferIndex] = m_textureBuffer[bufferIndex] * (c_sample / static_cast <float>(c_sample + 1));
+					//m_textureBuffer[bufferIndex] += (1 / static_cast <float>(c_sample + 1)) * m_bounceBuffer[segmentIndex].color;
 				}
-
-
-
-
+				
 				{
 					// Let's protect this with a mutex because it changes state in the texture.
 					// Doesn't seem to change anything but this way we can be sure we are not doing things wrong

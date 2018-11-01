@@ -52,9 +52,9 @@ namespace KIRK {
 		glm::vec3 result_direction_tt; //Outgoing ray for TT-Path
 		glm::vec3 result_direction_trt; //Outgoing ray for TRT-Path
 		glm::vec3 result_direction; //Final Outgoing ray after deciding which of the 3 from above we take
-		float pdf_r; //probability distribution function for R-Path
-		float pdf_tt; //probability distribution function for TT-Path
-		float pdf_trt; //probability distribution function for TRT-Path	
+		float pdf_r = 1; //probability distribution function for R-Path
+		float pdf_tt = 1; //probability distribution function for TT-Path
+		float pdf_trt = 1; //probability distribution function for TRT-Path	
 		float pdf; //Combined probability distribution function
 
 		//random uniform distribution for lobe alpha shift and beta width. We calculate it here not in the bsdf so we have the same value for every path in the lobe.
@@ -85,6 +85,7 @@ namespace KIRK {
 
 		// Sample bsdf for r-path
 		glm::vec3 scattering_r = bsdf->sample(hit, input_ray_normalized, hit.m_normal, result_direction_r, pdf_r, resultBounce.mat_flags, sample);
+		//glm::vec3 scattering_r = SpecularReflectionBSDF::localSample(hit, -input_ray_normalized, hit.m_normal, sample, result_direction_r, pdf_r, resultBounce.mat_flags);
 
 		//////////////////////////////////////////////
 		//  TT-PATH: Scattered Light calculation (RGB)
@@ -156,23 +157,20 @@ namespace KIRK {
 		pdf = (pdf_r + pdf_tt + pdf_trt) / 3.f;
 
 		//decide which direction we follow randomly
-		std::uniform_int_distribution<> dis(0, 2);
-		//int path = dis(m_gen);
-		int path = 0;
-		resultBounce.mat_flags = BSDFHelper::MATFLAG_SPECULAR_BOUNCE;
+		std::uniform_int_distribution<> dis(0, 1);
+		int path = dis(m_gen);
+		//path = 0;
 		if (path == 0)//we take R-Path as outgoing direction
 		{
 			resultRay = KIRK::Ray(hit.m_location + 1e-4f * result_direction_r, result_direction_r);
 		}
-		else if (path == 1)//we take TT-Path as outgoing direction
+		else if (path == 1)//we take TRT-Path as outgoing direction
 		{
-
-			resultRay = KIRK::Ray(t_hit.m_location + 1e-4f * result_direction_tt, result_direction_tt);
+			resultRay = KIRK::Ray(tr_hit.m_location + 1e-4f * result_direction_trt, result_direction_trt);			
 		}
-		else//we take TRT-Path as outgoing direction
+		else//we take TT-Path as outgoing direction
 		{
-
-			resultRay = KIRK::Ray(tr_hit.m_location + 1e-4f * result_direction_trt, result_direction_trt);
+			resultRay = KIRK::Ray(t_hit.m_location + 1e-4f * result_direction_tt, result_direction_tt);			
 		}
 
 		// Scattering Integral of outgoing radiance (Marschner Paper Formel 1)
@@ -180,7 +178,13 @@ namespace KIRK {
 			|| std::max(resultBounce.radiance.x, std::max(resultBounce.radiance.y, resultBounce.radiance.z)) < 0.01f)
 			resultBounce.radiance = glm::vec3(0);
 		else//Render-Equation (Marschner Equation 1). Theta_i is stored in sample.x and pdf is to account for radiance fallof
-			resultBounce.radiance *= glm::min((scattering_r*1000) * fiber_width * glm::abs(glm::cos(sample.x)) / pdf, 1.0f);
+		{
+			glm::vec3 r_radiance = glm::min(scattering_r * glm::abs(glm::dot(result_direction_r, hit.m_normal)) / pdf_r, 1.f);
+			glm::vec3 mar_radiance =  ((scattering_r + scattering_trt*10 + scattering_tt) * fiber_width * glm::abs(glm::cos(sample.x)) / pdf);
+			if (mar_radiance.x >= 1.f || mar_radiance.y >= 1.f || mar_radiance.z >= 1.f)
+				mar_radiance = glm::normalize(mar_radiance);
+			resultBounce.radiance *= glm::min(mar_radiance , 1.0f);
+		}
 
 
 		//Color vectors
@@ -198,6 +202,8 @@ namespace KIRK {
 
 		//Add new color to bounce
 		resultBounce.color += accumulatedColor;//KIRK::Color::RGBA(result_direction_r, 1.f);
+		if (accumulatedColor.x > 0.01f)
+			float test = 0;
 
 	}
 
@@ -226,7 +232,7 @@ namespace KIRK {
 		if (light->m_color.x > 0 || light->m_color.y > 0 || light->m_color.z > 0)
 		{
 			lightColor *= attenuation//attenuation factor of the light. Calculated in light->calcLightdir()
-				* glm::vec4(hit.m_object->getMaterial()->m_bsdf->evaluateLight(hit, hitToLight.m_direction, -hit.m_ray.m_direction), 1.0f)//light influence at hit point. calc by the bsdf
+				* glm::vec4(hit.m_object->getMaterial()->m_bsdf->evaluateLight(hit, hitToLight.m_direction, hit.m_ray.m_direction), 1.0f)//light influence at hit point. calc by the bsdf
 				* std::abs(glm::dot(hitToLight.m_direction, hit.m_normal));//angle between ray towards light and normal
 
 			if (lightColor.x > 0 || lightColor.y > 0 || lightColor.z > 0)

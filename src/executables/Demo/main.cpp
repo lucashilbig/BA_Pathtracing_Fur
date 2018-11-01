@@ -226,12 +226,12 @@ int main(int argc, char *argv[])
 	
 
 	//Initializing environment map (cubeMap here)
-	/*scene->getEnvironment()->loadCubeMap(RESOURCES_PATH "/cubeMap/posx.jpg",
+	scene->getEnvironment()->loadCubeMap(RESOURCES_PATH "/cubeMap/posx.jpg",
 		RESOURCES_PATH "/cubeMap/posy.jpg",
 		RESOURCES_PATH "/cubeMap/posz.jpg",
 		RESOURCES_PATH "/cubeMap/negx.jpg",
 		RESOURCES_PATH "/cubeMap/negy.jpg",
-		RESOURCES_PATH "/cubeMap/negz.jpg");*/
+		RESOURCES_PATH "/cubeMap/negz.jpg");
 
 	//save scene to json file
 	//jsonio::writeScene(scene, std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/")));

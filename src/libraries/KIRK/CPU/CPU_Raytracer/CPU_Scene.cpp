@@ -155,7 +155,7 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 					for (int i = 0; i < mesh->m_furFibers.size(); i++)
 					{
 						//create triangles from the current fur fiber
-						std::vector<Triangle *> triangles = std::move(fiberToTriangles(mesh->m_furFibers[i], base_transform * child->m_transform, 5));
+						std::vector<Triangle *> triangles = std::move(fiberToTriangles(mesh->m_furFibers[i], base_transform * child->m_transform, 8));
 						//push triangle material to mesh material list, so we can see it in our gui
 						mesh->m_materials.push_back(std::shared_ptr<KIRK::Material>(triangles[0]->getMaterial()));
 						//push triangles to m_scene_objects

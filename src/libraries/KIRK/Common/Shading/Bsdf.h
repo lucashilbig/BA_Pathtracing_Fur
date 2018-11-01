@@ -307,6 +307,19 @@ public:
 	* @param cos_theta_c theta cone angle from d'Eon 2013 paper
 	*/
 	static float M_p(float cos_theta_c, float cos_theta_r, float sin_theta_c, float sin_theta_r, float v);
+
+	/*@brief Calculates the D'Eon absorption coefficient mü_a from eumelanin and pheomelanin concentration
+	* @param eumelanin. Concetration p_e of eumelanin in hair fiber
+	* @param pheomelanin. Concetration p_p of pheomelanin in hair fiber
+	* @return absorption coefficient mü_a
+	*/
+	static glm::vec3 calcAbsorpCoeff(float eumelanin, float pheomelanin);
+
+	/* Calculates the color absorption factor using Equation of Marschner Paper section 4.3
+	@param sigma_a. The color absorption coefficient sigma_a
+	@param gamma_t. fibers internal offset angle gamma_t
+	*/
+	static glm::vec3 T(glm::vec3 sigma_a, float gamma_t);
 	
 };
 

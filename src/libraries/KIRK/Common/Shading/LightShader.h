@@ -20,7 +20,7 @@ namespace KIRK {
 	inline void LightShader::shade(KIRK::CPU::PathTracer& pathtracer, const KIRK::Intersection& hit, KIRK::CPU::Bounce& resultBounce, KIRK::Ray& resultRay)
 	{
 		auto light = pathtracer.getScene().getLights()[hit.m_barycentric_coord.y].get();
-		resultBounce.color += glm::vec4(light->sampleLightSource(hit.m_ray.m_direction, hit.m_ray.m_origin, hit.m_lambda) * resultBounce.radiance, 1.0f);
+		resultBounce.color += glm::min(glm::vec4(light->sampleLightSource(hit.m_ray.m_direction, hit.m_ray.m_origin, hit.m_lambda) * resultBounce.radiance, 1.0f), 1.0f);
 		resultBounce.radiance = glm::vec3(0);
 	}
 

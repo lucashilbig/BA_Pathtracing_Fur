@@ -306,6 +306,9 @@ namespace KIRK {
 		/*bool reflect = glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0;
 		if (reflect) { return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::SPECULAR>(hit.m_texcoord)) * glm::one_over_pi <float>(); }*/
 		return glm::vec3(0);
+		glm::vec3 reflected_ray = glm::reflect(-local_output_ray, glm::faceforward(hit.m_normal, -local_output_ray, hit.m_normal));
+		return glm::vec3(glm::dot(local_input_ray, reflected_ray) * glm::one_over_pi<float>());
+		
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////
@@ -670,7 +673,7 @@ namespace KIRK {
 			//--------------------------------------------------------------------
 
 			//If we have a refraction (One vector is in positiv hemisphere and the other in negativ) we return our scat value
-			if (!(glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0))
+			if (!(glm::dot(local_output_ray, hit.m_normal) > 0))
 				return (output_pdf * n_tt / glm::pow2(cos_theta_d));
 			else
 				return glm::vec3(0.f);
@@ -740,7 +743,8 @@ namespace KIRK {
 				t = glm::smoothstep(2.f, 2.3f, bravais_first);
 			}
 
-			float gamma_i = glm::asin(h);
+			float gamma_i = glm::asin(h);			
+
 			//From ruenz12 bachelorthesis Equation 44, which derived it from marschner Equation 10.
 			float dphi_dh = 1 / glm::sqrt(1 - h * h) * ((-(48 * c / glm::pow3(glm::pi<float>())) * glm::pow2(gamma_i)) + (12 * c / glm::pi<float>() - 2));
 
@@ -753,9 +757,11 @@ namespace KIRK {
 			//glm::vec3 sigma_a = calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			glm::vec3 sigma_a = glm::max(glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)), 0.2f);//Min Value from Marschner Paper for sigma is 0.2
+			glm::vec3 mü_a = KIRK::DEonHairBSDF::calcAbsorpCoeff(0.005f, 0.00f) / glm::cos(theta_r);
 
 			//full attenuation
 			glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(T(sigma_a, gamma_t));
+			//glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(KIRK::DEonHairBSDF::T(mü_a, gamma_t));
 
 			//calculate gauss values for power apporximation from section 5.2.2
 			float gauss_0 = BSDFHelper::normal_gauss_pdf(0.f, 0.f, w_c);
@@ -777,11 +783,13 @@ namespace KIRK {
 			if (std::isnan(scat.x) || std::isnan(scat.y) || std::isnan(scat.z))
 				scat = glm::vec3(0.f);
 
-			//If we have a reflection(Both vectors are in positiv hemisphere) we return our scat value
-			if ((glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0))
+			return scat;
+
+			/*//If we have a reflection(Both vectors are in positiv hemisphere) we return our scat value
+			if ((glm::dot(-local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0))
 				return scat;
 			else
-				return glm::vec3(0.f);
+				return glm::vec3(0.f);*/
 		}
 		else//We take Cylinder Path: R (Reflection on Surface)
 		{
@@ -806,7 +814,7 @@ namespace KIRK {
 			float theta_d = (theta_r - theta_i) / 2;//theta difference angle
 
 			//M_r(theta_h) -> gaussian function with zero-mean and our fibers material standart derivation. TODO: Try Logistic function as suggested in pixar paper
-			output_pdf = BSDFHelper::normal_gauss_pdf(theta_h - glm::radians(alpha_r), 0.0f, beta_r);
+			output_pdf = 10 * BSDFHelper::normal_gauss_pdf(theta_h - glm::radians(alpha_r), 0.0f, beta_r);
 			//output_pdf = BSDFHelper::Logistic(theta_h - glm::radians(alpha_r), beta_r);
 
 			//--------------------------------------------------------------------
@@ -833,7 +841,7 @@ namespace KIRK {
 
 			//calculate attenuation factor with fresnel
 			//float fresnel = BSDFHelper::dialectricFresnel(glm::cos(glm::asin(h)), bravais_first, bravais_sec);
-			float fresnel = BSDFHelper::dialectricFresnel(glm::dot(local_input_ray, hit.m_normal), bravais_first, bravais_sec);
+			float fresnel = BSDFHelper::dialectricFresnel(glm::abs(glm::dot(-local_input_ray, normal)), 1.f, material->m_ior);
 
 			//final term for N_r(phi). Marschner Equation 8
 			float n_r = 0.5f * fresnel / glm::abs(2 * dphi_dh);
@@ -845,7 +853,7 @@ namespace KIRK {
 			return glm::vec3(scatt_func);
 
 			/*//If we have a reflection(Both vectors are in positiv hemisphere) we return our scat value
-			if ((glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0))
+			if ((glm::dot(-local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0))
 				return glm::vec3(scatt_func);
 			else
 				return glm::vec3(0.f);*/
@@ -855,10 +863,10 @@ namespace KIRK {
 
 	glm::vec3 MarschnerHairBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray)
 	{
-		//Normally we would check if we really have an reflection or refraction, but since we dont know if we have to check for R, TT or TRT
-		//Path we do this directly in the sample_bsdf function
-		return glm::vec3(0);
-		return glm::vec3(1.f) * glm::one_over_pi <float>();
+		//return glm::vec3(0);
+		int n = 5;//glanzzahl
+		glm::vec3 reflected_ray = glm::reflect(local_output_ray, glm::faceforward(hit.m_normal, local_output_ray, hit.m_normal));
+		return glm::vec3(glm::pow(glm::dot(local_input_ray, reflected_ray), n));
 	}
 
 	glm::vec3 MarschnerHairBSDF::calcSigmaFromColor(KIRK::Color::RGBA color, float beta_n)
@@ -886,32 +894,30 @@ namespace KIRK {
 
 	glm::vec3 DEonHairBSDF::localSample(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& normal, glm::vec2& sample, glm::vec3& local_output_ray, float& output_pdf, int& mat_flags, bool useRadianceOverImportance)
 	{
-		//Cast Object to cylinder
-		KIRK::Cylinder *cylinder_obj = dynamic_cast<KIRK::Cylinder*>(hit.m_object);
-
-		//if we have no cylinder as Object we return 0
-		if (cylinder_obj == NULL)
-			return glm::vec3(0.f);
+		//objects local axis
+		glm::vec3 u_axis = hit.m_object->getV();
+		glm::vec3 v_axis = hit.m_object->getU();
+		glm::vec3 w_axis = hit.m_object->getW();
 
 		//needed parameters
 		Material* material = hit.m_object->getMaterial();
 		glm::vec2 texcoord = hit.m_texcoord;
 
-		//calculation of tangent vector
-		glm::vec3 c1 = glm::cross(normal, glm::vec3(0.0, 0.0, 1.0));
-		glm::vec3 c2 = glm::cross(normal, glm::vec3(0.0, 1.0, 0.0));
-		glm::vec3 tangent = (glm::length(c1) > glm::length(c2)) ? glm::normalize(c1) : glm::normalize(c2);
+		//If we accidently hit an object without hair bsdf we can return
+		if (material->m_current_bsdf < 6 || material->m_current_bsdf > 8)
+			return glm::vec3(0);
 
-		//get light ray
-		glm::vec3 hit_to_light = glm::normalize(local_output_ray);
+		//move light ray to cylinders (fibers) local space.		
+		glm::vec3 hit_to_light = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
-		//calculate spherical coordinates of light ray. NOTE: std::atan2 is atan(y/x) using the signs of arguments to determine the correct quadrant
-		float theta_i = std::atan2(hit_to_light.x, hit_to_light.z);//Angle between light ray and fibers v-w(normal-)plane(Inclinations with respect of the fibers normalplane). Around v-axis
+		//calculate spherical coordinates of light ray. NOTE: std::atan2 is atan(y/x) using the signs of arguments to determine the correct quadrant. range [-pi, pi], so we wrap it to marschner range [-pi/2, pi/2]
+		float theta_i = BSDFHelper::atan2ThetaToMarschner(std::atan2(hit_to_light.x, hit_to_light.z));//Angle between light ray and fibers v-w(normal-)plane(Inclinations with respect of the fibers normalplane). Around v-axis
 		float phi_i = std::atan2(std::hypot(hit_to_light.x, hit_to_light.z), hit_to_light.y);//azimuth angle. Around x(fibers u-)-axis
+		phi_i = (hit_to_light.z >= 0.0f) ? phi_i : -phi_i;//wrap phi to account for std::hypot() erasing minus of z(local w)-coordinate, because marschner phi range is [-pi, pi]
 
-		//Get lobe alpha and beta which is stored in the sample parameter
+														  //Get lobe alpha and beta which is stored in the sample parameter
 		float alpha_r = sample.x;//longitudinal shift. Suggested value from marschner hair paper between -10 and -5 degrees
-		float beta_r = sample.y;//longitudinal width (stdev.). Suggested value from marschner hair paper between 5 and 10 degrees		
+		float beta_r = sample.y;//longitudinal width (stdev.). Suggested value from marschner hair paper between 5 and 10 degrees			
 
 		//We are inside the cylinder and we want to take Cylinder Path: TT (refractive transmission, p = 1)
 		if (mat_flags & BSDFHelper::MATFLAG_CYLINDER_T_BOUNCE)
@@ -920,20 +926,20 @@ namespace KIRK {
 			local_output_ray = glm::refract(local_input_ray, glm::faceforward(normal, local_input_ray, normal), 1.f / material->m_ior);
 
 			//rotate towards normal to account for the tilted fiber surface
-			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-alpha_r / 2), tangent));
+			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-alpha_r / 2), u_axis));
 
 			//reset material flags and set it to finished path since we leave the cylinder
 			mat_flags = 0;
 
-			//get ourgoing ray
-			glm::vec3 out_ray_cyl = glm::normalize(local_output_ray);
+			//move output ray to cylinders (fibers) local space.
+			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
 			//--------------------------------------------------------------------
 			// M_tt(v, theta_i, theta_r) : d'Eon marginal, longitudinal	scattering function(M)  			
 			//--------------------------------------------------------------------
 
 			//calculate parameters for M
-			float theta_r = std::atan2(out_ray_cyl.x, out_ray_cyl.z);//Angle between reflected output ray and fibers u-w(normal-) plane
+			float theta_r = BSDFHelper::atan2ThetaToMarschner(std::atan2(out_ray_cyl.x, out_ray_cyl.z));//Angle between reflected output ray and fibers u-w(normal-) plane
 			float theta_d = (theta_r - theta_i) / 2;//theta difference angle
 
 			//M_tt -> d'Eon Equation 7
@@ -946,6 +952,7 @@ namespace KIRK {
 
 			//calculate parameters for N
 			float phi_r = std::atan2(std::hypot(out_ray_cyl.x, out_ray_cyl.z), out_ray_cyl.y);
+			phi_r = (out_ray_cyl.z >= 0.0f) ? phi_r : -phi_r;//wrap phi to account for std::hypot() erasing minus of z(local w)-coordinate, because marschner phi range is [-pi, pi]
 			float phi = phi_r - phi_i;
 
 			//calculation of h from marschner but the concrete equation is from d'Eon paper (Above Equation 9)
@@ -962,23 +969,26 @@ namespace KIRK {
 
 			//calculate fresnel which is part of attenuation. d'Eon Equation 14
 			float fresnel = BSDFHelper::dialectricFresnel(glm::acos(glm::cos(theta_d) * glm::cos(gamma_i)), material->m_ior, 1.f);
-			if (fresnel == 1) fresnel = 0.f;//so it doesnt change att_color to 0
 
 			//new color absorption coefficient
 			//glm::vec3 sigma_a = calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
-			glm::vec3 sigma_a = glm::max(glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)), 0.2f) / glm::cos(theta_r);//Min Value from Marschner Paper for sigma is 0.2
+			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);
+			glm::vec3 mü_a = calcAbsorpCoeff(0.2f, 0.00f) / glm::cos(theta_r);
 
 			//full attenuation factor. d'Eon Equation 13 with p = 1
-			glm::vec3 att_color = glm::pow2(1 - fresnel) * KIRK::MarschnerHairBSDF::T(sigma_a, glm::asin(h / material->m_ior));
+			glm::vec3 att_color = glm::pow2(1 - fresnel) * DEonHairBSDF::T(mü_a, glm::asin(h / material->m_ior));
 
 			//final term for N_tt(phi). d'Eon Equation 10
 			glm::vec3 n_tt = 0.5f * att_color * d_tt;
 
 			//--------------------------------------------------------------------
 
-			//return final scattering function
-			return (output_pdf * n_tt);
+			//If we have a refraction (One vector is in positiv hemisphere and the other in negativ) we return our scat value
+			if (!(glm::dot(local_output_ray, hit.m_normal) > 0))
+				return (output_pdf * n_tt);
+			else
+				return glm::vec3(0.f);
 
 		}//We are inside the cylinder and we want to take Cylinder Path: TRT (refractive transmission, p = 2)
 		else if (mat_flags & BSDFHelper::MATFLAG_CYLINDER_TR_BOUNCE)//We are inside the cylinder and we want to take Cylinder Path: TRT (p = 2)
@@ -987,20 +997,20 @@ namespace KIRK {
 			local_output_ray = glm::refract(local_input_ray, glm::faceforward(normal, local_input_ray, normal), 1.f);
 
 			//rotate towards normal to account for the tilted fiber surface
-			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-3.f * alpha_r / 2.f), tangent));
+			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(-3.f * alpha_r / 2.f), u_axis));
 
 			//reset material flags and set it to finished path since we leave the cylinder
 			mat_flags = 0;
 
-			//get ourgoing ray
-			glm::vec3 out_ray_cyl = glm::normalize(local_output_ray);
+			//move output ray to cylinders (fibers) local space.
+			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
 			//--------------------------------------------------------------------
 			// M_trt(v, theta_i, theta_r) : d'Eon marginal, longitudinal scattering function(M)  			
 			//--------------------------------------------------------------------
 
 			//calculate parameters for M
-			float theta_r = std::atan2(out_ray_cyl.x, out_ray_cyl.z);//Angle between reflected output ray and fibers u-w(normal-) plane
+			float theta_r = BSDFHelper::atan2ThetaToMarschner(std::atan2(out_ray_cyl.x, out_ray_cyl.z));//Angle between reflected output ray and fibers u-w(normal-) plane
 			float theta_d = (theta_r - theta_i) / 2;//theta difference angle
 			sample.x = theta_i; sample.y = 0;//We store the theta_i angle in it, because we need it in the MarschnerHairShader method
 											 //and this trt-path is the last call of the bsdf. We dont want to override the previously stored alpha/beta values.
@@ -1015,10 +1025,11 @@ namespace KIRK {
 
 			//calculate parameters for N
 			float phi_r = std::atan2(std::hypot(out_ray_cyl.x, out_ray_cyl.z), out_ray_cyl.y);
+			phi_r = (out_ray_cyl.z >= 0.0f) ? phi_r : -phi_r;//wrap phi to account for std::hypot() erasing minus of z(local w)-coordinate, because marschner phi range is [-pi, pi]
 			float phi = phi_r - phi_i;
-			float gamma_i = glm::angle(local_input_ray, glm::normalize(normal));//angle between input ray and surface normal in radians
+			float gamma_i = glm::angle(-local_input_ray, glm::normalize(normal));//angle between input ray and surface normal in radians
 			float h = glm::clamp(glm::sin(gamma_i), -1.f, 1.f);
-
+						
 			//second part of N equation (first part is attenuation factor)
 			//Gaussian detector with 20 iterations. d'Eon Equation 11
 			float d_trt = 0;
@@ -1031,10 +1042,11 @@ namespace KIRK {
 			//new color absorption coefficient
 			//glm::vec3 sigma_a = calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
-			glm::vec3 sigma_a = glm::max(glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)), 0.2f) / glm::cos(theta_r);//Min Value from Marschner Paper for sigma is 0.2
+			//glm::vec3 sigma_a =glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);
+			glm::vec3 mü_a = calcAbsorpCoeff(0.05f, 0.00f) / glm::cos(theta_r);
 
 			//full attenuation factor. d'Eon Equation 13 with p = 2
-			glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel * glm::pow2(KIRK::MarschnerHairBSDF::T(sigma_a, glm::asin(h / material->m_ior)));
+			glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel * glm::pow2(DEonHairBSDF::T(mü_a, glm::asin(h / material->m_ior)));
 
 			//final term for N_trt(phi). d'Eon Equation 10
 			glm::vec3 n_trt = 0.5f * att_color * d_trt;
@@ -1050,19 +1062,19 @@ namespace KIRK {
 			//reflect input ray on the surface
 			local_output_ray = glm::reflect(local_input_ray, glm::faceforward(normal, local_input_ray, normal));
 			//rotate towards normal to account for the tilted fiber surface
-			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(2 * alpha_r), tangent));
+			local_output_ray = glm::vec3(glm::vec4(local_output_ray, 0.f) * glm::rotate(glm::radians(2 * alpha_r), u_axis));
 			//Reset the mat_flags and set it to finished path since we leave the cylinder
 			mat_flags = BSDFHelper::MATFLAG_SPECULAR_BOUNCE;
 
-			//get ourgoing ray
-			glm::vec3 out_ray_cyl = glm::normalize(local_output_ray);
+			//move output ray to cylinders (fibers) local space.
+			glm::vec3 out_ray_cyl = Math::worldToLocal(glm::normalize(local_output_ray), u_axis, v_axis, w_axis);
 
 			//--------------------------------------------------------------------
 			// M_r(v, theta_i, theta_r) : d'Eon marginal, longitudinal	scattering function(M)  			
 			//--------------------------------------------------------------------
 
 			//calculate parameters for M
-			float theta_r = std::atan2(out_ray_cyl.x, out_ray_cyl.z);//Angle between reflected output ray and fibers u-w(normal-) plane
+			float theta_r = BSDFHelper::atan2ThetaToMarschner(std::atan2(out_ray_cyl.x, out_ray_cyl.z));//Angle between reflected output ray and fibers u-w(normal-) plane
 
 			//M_r -> d'Eon Equation 7
 			output_pdf = M_p(glm::cos(-theta_i + 2 * alpha_r), glm::cos(theta_r), glm::sin(-theta_i + 2 * alpha_r), glm::sin(theta_r), glm::radians(beta_r * beta_r));
@@ -1073,11 +1085,12 @@ namespace KIRK {
 
 			//calculate parameters for N
 			float phi_r = std::atan2(std::hypot(out_ray_cyl.x, out_ray_cyl.z), out_ray_cyl.y);
+			phi_r = (out_ray_cyl.z >= 0.0f) ? phi_r : -phi_r;//wrap phi to account for std::hypot() erasing minus of z(local w)-coordinate, because marschner phi range is [-pi, pi]
 			float phi = phi_r - phi_i;
 			float d_r = 0.25f * glm::abs(glm::cos(phi / 2.f));//d'Eon Equation 6
 
 			//calculate attenuation factor with fresnel. d'Eon Equation 12
-			float fresnel = BSDFHelper::dialectricFresnel(0.5f * glm::acos(glm::dot(local_input_ray, glm::normalize(local_output_ray))), 1.f, material->m_ior);
+			float fresnel = BSDFHelper::dialectricFresnel(0.5f * glm::acos(glm::dot(-local_input_ray, glm::normalize(local_output_ray))), 1.f, material->m_ior);
 
 			//final term for N_r(phi). d'Eon Equation 10
 			float n_r = 0.5f * fresnel * d_r;
@@ -1092,9 +1105,10 @@ namespace KIRK {
 
 	glm::vec3 DEonHairBSDF::evaluateLight(const Intersection& hit, const glm::vec3& local_input_ray, const glm::vec3& local_output_ray)
 	{
-		bool reflect = glm::dot(local_input_ray, hit.m_normal) * glm::dot(local_output_ray, hit.m_normal) > 0;
-		if (reflect) { return glm::vec3(hit.m_object->getMaterial()->fetchParameterColor <MatParamType::DIFFUSE>(hit.m_texcoord)) * glm::one_over_pi <float>(); }
-		return glm::vec3(0);
+		//return glm::vec3(0);
+		int n = 5;//glanzzahl
+		glm::vec3 reflected_ray = glm::reflect(local_output_ray, glm::faceforward(hit.m_normal, local_output_ray, hit.m_normal));
+		return glm::vec3(glm::pow(glm::dot(local_input_ray, reflected_ray), n));
 	}
 
 	float DEonHairBSDF::M_p(float cos_theta_c, float cos_theta_r, float sin_theta_c, float sin_theta_r, float v)
@@ -1107,6 +1121,16 @@ namespace KIRK {
 		//compensation for low roughness v values from d'eon 2013 paper
 		float m_p = (v <= 0.1f) ? glm::exp(BSDFHelper::logBessel(x) - y - (1 / v) + 0.6931f + glm::log(1 / (2 * v))) : (glm::exp(-y) * BSDFHelper::bessel(x)) / csch;
 		return m_p;
+	}
+
+	glm::vec3 DEonHairBSDF::calcAbsorpCoeff(float eumelanin, float pheomelanin)
+	{
+		return eumelanin * glm::vec3(0.419f, 0.697f, 1.37f) + pheomelanin * glm::vec3(0.187f, 0.4f, 1.05f);
+	}
+
+	glm::vec3 DEonHairBSDF::T(glm::vec3 sigma_a, float gamma_t)
+	{
+		return glm::exp(-2.f * sigma_a * (1 + glm::cos(2.f * gamma_t)));
 	}
 
 
