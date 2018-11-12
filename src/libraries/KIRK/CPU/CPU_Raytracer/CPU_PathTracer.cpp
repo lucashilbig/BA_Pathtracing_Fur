@@ -238,6 +238,11 @@ namespace KIRK {
 			}
 		}
 
+		int PathTracer::getMaximalSampleCount()
+		{
+			return m_samples_per_pixel;
+		}
+
 		void PathTracer::windowResizeCallback() { m_has_resized = true; }
 
 		void PathTracer::reset()

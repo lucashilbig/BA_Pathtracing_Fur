@@ -179,8 +179,8 @@ namespace KIRK {
 			resultBounce.radiance = glm::vec3(0);
 		else//Render-Equation (Marschner Equation 1). Theta_i is stored in sample.x and pdf is to account for radiance fallof
 		{
-			glm::vec3 r_radiance = glm::min(scattering_r * glm::abs(glm::dot(result_direction_r, hit.m_normal)) / pdf_r, 1.f);
-			glm::vec3 mar_radiance =  ((scattering_r + scattering_trt*10 + scattering_tt) * fiber_width * glm::abs(glm::cos(sample.x)) / pdf);
+			//glm::vec3 r_radiance = glm::min(scattering_r * glm::abs(glm::dot(result_direction_r, hit.m_normal)) / pdf_r, 1.f);
+			glm::vec3 mar_radiance =  ((scattering_r + scattering_trt + scattering_tt) * fiber_width * glm::abs(glm::cos(sample.x)) / pdf);
 			if (mar_radiance.x >= 1.f || mar_radiance.y >= 1.f || mar_radiance.z >= 1.f)
 				mar_radiance = glm::normalize(mar_radiance);
 			resultBounce.radiance *= glm::min(mar_radiance , 1.0f);
@@ -201,9 +201,7 @@ namespace KIRK {
 		accumulatedColor += directLight * glm::vec4(resultBounce.radiance, 1.0f);//add direct light to color
 
 		//Add new color to bounce
-		resultBounce.color += accumulatedColor;//KIRK::Color::RGBA(result_direction_r, 1.f);
-		if (accumulatedColor.x > 0.01f)
-			float test = 0;
+		resultBounce.color += accumulatedColor;
 
 	}
 

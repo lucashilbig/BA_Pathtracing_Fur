@@ -119,6 +119,8 @@ namespace KIRK
 
 		glm::vec3 getPosition() { return m_position; }
 
+		glm::vec3 getLookAt() { return m_look_at; }
+
 		glm::vec3 getStepX();
 
 		glm::vec3 getStepY();

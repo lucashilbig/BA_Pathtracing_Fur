@@ -663,9 +663,11 @@ namespace KIRK {
 			//glm::vec3 sigma_a = calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord));
-
+			//glm::vec3 mü_a = KIRK::DEonHairBSDF::calcAbsorpCoeff(0.05f, 0.00f) / glm::cos(theta_r);
+			
 			//attenuation factor, which contains color absorbtion. Marschner above Equation 8
 			glm::vec3 att_color = glm::pow2(1 - fresnel) * T(sigma_a, glm::asin(h / bravais_first));
+			//glm::vec3 att_color = glm::pow2(1 - fresnel) * glm::pow2(KIRK::DEonHairBSDF::T(mü_a, glm::asin(h / material->m_ior)));
 
 			//final term for N_tt(phi). Marschner Equation 8.
 			glm::vec3 n_tt = 0.5f * att_color / glm::abs(2 * dphi_dh);
@@ -757,7 +759,7 @@ namespace KIRK {
 			//glm::vec3 sigma_a = calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			glm::vec3 sigma_a = glm::max(glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)), 0.2f);//Min Value from Marschner Paper for sigma is 0.2
-			glm::vec3 mü_a = KIRK::DEonHairBSDF::calcAbsorpCoeff(0.005f, 0.00f) / glm::cos(theta_r);
+			//glm::vec3 mü_a = KIRK::DEonHairBSDF::calcAbsorpCoeff(0.05f, 0.00f) / glm::cos(theta_r);
 
 			//full attenuation
 			glm::vec3 att_color = glm::pow2(1 - fresnel) * fresnel_exit * glm::pow2(T(sigma_a, gamma_t));
@@ -814,7 +816,7 @@ namespace KIRK {
 			float theta_d = (theta_r - theta_i) / 2;//theta difference angle
 
 			//M_r(theta_h) -> gaussian function with zero-mean and our fibers material standart derivation. TODO: Try Logistic function as suggested in pixar paper
-			output_pdf = 10 * BSDFHelper::normal_gauss_pdf(theta_h - glm::radians(alpha_r), 0.0f, beta_r);
+			output_pdf = BSDFHelper::normal_gauss_pdf(theta_h - glm::radians(alpha_r), 0.0f, beta_r);
 			//output_pdf = BSDFHelper::Logistic(theta_h - glm::radians(alpha_r), beta_r);
 
 			//--------------------------------------------------------------------
@@ -881,9 +883,7 @@ namespace KIRK {
 
 	glm::vec3 MarschnerHairBSDF::T(glm::vec3 sigma_a, float gamma_t)
 	{
-		return glm::exp(2.f * sigma_a * (1 + glm::cos(2.f * gamma_t)));
-		//Note: Changed sigma factor from -2 to 2, because we can use RGB Diffuse colors [0, 1] this way.
-		//Its easier to controll than the -2 version with an arbitrary absorption factor
+		return glm::exp(-2.f * sigma_a * (1 + glm::cos(2.f * gamma_t)));
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////
@@ -974,7 +974,7 @@ namespace KIRK {
 			//glm::vec3 sigma_a = calcSigmaFromColor(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::SIGMA_A>(texcoord));
 			//glm::vec3 sigma_a = glm::vec3(material->fetchParameterColor<MatParamType::DIFFUSE>(texcoord)) / glm::cos(theta_r);
-			glm::vec3 mü_a = calcAbsorpCoeff(0.2f, 0.00f) / glm::cos(theta_r);
+			glm::vec3 mü_a = calcAbsorpCoeff(0.05f, 0.00f) / glm::cos(theta_r);
 
 			//full attenuation factor. d'Eon Equation 13 with p = 1
 			glm::vec3 att_color = glm::pow2(1 - fresnel) * DEonHairBSDF::T(mü_a, glm::asin(h / material->m_ior));

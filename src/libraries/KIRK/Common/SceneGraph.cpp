@@ -309,7 +309,7 @@ void KIRK::SceneGraph::createDefaultEnvironment()
 {
 	//Use a light blue colored background as default-
     m_environment = std::unique_ptr<Environment>(new Environment());
-	m_environment->setColor(Color::RGBA(0.82f, 0.85f, 1.f, 1.f));//0.82f, 0.85f, 1.f
+	m_environment->setColor(Color::RGBA(0.62f, 0.65f, 0.8f, 1.f));//0.82f, 0.85f, 1.f
 }
 
 void KIRK::SceneGraph::addFurFibersToAllMeshes(unsigned int fibers_per_face, unsigned int num_fiber_verts, float fiber_radius)

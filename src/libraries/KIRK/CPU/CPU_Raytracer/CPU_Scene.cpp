@@ -115,7 +115,7 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 					//transform *= glm::scale(glm::vec3(0.2f, 0.2f, 0.2f));
 					//Material for fur fibers with marschnerHairBSDF and -Shader
 					std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat", 6);//Boolean to call the constructor which uses MarschnerHairBsdf and -Shader
-					mat->m_diffuse.value = KIRK::Color::RGBA(0.43f, 0.353f, 0.2f, 1.0f);//Brown color 0.43f, 0.353f, 0.2f. Sigma_value for blond hair: 0.21f, 0.34f, 0.98f
+					mat->m_diffuse.value = KIRK::Color::RGBA(0.27f, 0.45f, 0.65f, 1.0f);//Brown color 0.43f, 0.353f, 0.2f. Sigma_value for blond hair: 0.21f, 0.34f, 0.98f
 					mat->m_ior = 1.55f;//suggested value from marschner hair paper
 					mat->m_reflectivity.value = 1.f;
 					//mat->m_hairBSDF = std::make_shared<ChiangHairBSDF>();

@@ -55,6 +55,11 @@ public:
 	*/
 	int getCurrentSampleCount();
 	/**
+	* \brief Get the number of the maximal sample count
+	* \return the maximal number of samples
+	*/
+	int getMaximalSampleCount();
+	/**
 	* \brief Not being called anywhere. Should provide an interface to notify for window resizes.
 	*/
 	void windowResizeCallback();
