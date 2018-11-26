@@ -104,23 +104,21 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 			//If we have fur fibers in our mesh, we convert them to cylinders or triangles
 			if (!mesh->m_furFibers.empty())
 			{
+				//transformation of fur fiber
+				glm::mat4 transform = base_transform * child->m_transform;
+				//Material for fur fibers with marschnerHairBSDF and -Shader
+				std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat", 6);//Boolean to call the constructor which uses MarschnerHairBsdf and -Shader
+				mat->m_diffuse.value = KIRK::Color::RGBA(0.27f, 0.45f, 0.65f, 1.0f);//Brown color 0.43f, 0.353f, 0.2f. Sigma_value for blond hair: 0.21f, 0.34f, 0.98f
+				mat->m_ior = 1.55f;//suggested value from marschner hair paper
+				mat->m_reflectivity.value = 1.f;
+				//mat->m_hairBSDF = std::make_shared<ChiangHairBSDF>();
+				m_materials.push_back(mat);
+				mesh->m_materials.push_back(mat);
+
 				if (m_fiberAsCylinder) {
 					//////
 					// FIBER TO CYLINDER
-					//////									
-
-					//transformation of fur fiber
-					glm::mat4 transform = base_transform * child->m_transform;
-					//Scale down to comprehend big cylinder radius(needed cause they dont work properly with radius < 0.1)
-					//transform *= glm::scale(glm::vec3(0.2f, 0.2f, 0.2f));
-					//Material for fur fibers with marschnerHairBSDF and -Shader
-					std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat", 6);//Boolean to call the constructor which uses MarschnerHairBsdf and -Shader
-					mat->m_diffuse.value = KIRK::Color::RGBA(0.27f, 0.45f, 0.65f, 1.0f);//Brown color 0.43f, 0.353f, 0.2f. Sigma_value for blond hair: 0.21f, 0.34f, 0.98f
-					mat->m_ior = 1.55f;//suggested value from marschner hair paper
-					mat->m_reflectivity.value = 1.f;
-					//mat->m_hairBSDF = std::make_shared<ChiangHairBSDF>();
-					m_materials.push_back(mat);
-					mesh->m_materials.push_back(mat);
+					//////			
 
 					//Iterate over every fur fiber
 					for (int i = 0; i < mesh->m_furFibers.size(); i++)
@@ -136,7 +134,7 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 							//move base position a bit to hide cone edges in the fiber struct
 							basepos -= 0.001f * (apexpos - basepos);
 							//lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
-							baseradius -= 0.02f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
+							baseradius -= 0.02f * baseradius;
 							//create raytracing cylinder object
 							KIRK::Cylinder *obj = new KIRK::Cylinder(basepos, apexpos,
 								baseradius, fiber->fiber_radius[c + 1], &transform);
@@ -155,12 +153,13 @@ void KIRK::CPU::Scene::flattenNode(std::shared_ptr<KIRK::SceneNode> sceneNode, g
 					for (int i = 0; i < mesh->m_furFibers.size(); i++)
 					{
 						//create triangles from the current fur fiber
-						std::vector<Triangle *> triangles = std::move(fiberToTriangles(mesh->m_furFibers[i], base_transform * child->m_transform, 8));
-						//push triangle material to mesh material list, so we can see it in our gui
-						mesh->m_materials.push_back(std::shared_ptr<KIRK::Material>(triangles[0]->getMaterial()));
+						std::vector<Triangle *> triangles = std::move(fiberToTriangles(mesh->m_furFibers[i], transform, 8));
 						//push triangles to m_scene_objects
 						for (int t = 0; t < triangles.size(); t++)
 						{
+							//set material with hair bsdf
+							triangles[t]->setMaterial(mat.get());
+							//push to scene
 							m_scene_objects.push_back(triangles[t]);
 						}
 					}
@@ -247,12 +246,6 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 	glm::vec3 n1, n2, n;
 	glm::vec3 m_v, m_u, m_w;
 	float m_height, m_slope;
-	//Material for fur fibers with marschnerHairBSDF and -Shader
-	std::shared_ptr<KIRK::Material> mat = std::make_shared<KIRK::Material>("Fiber_Mat", 6);//Boolean to call the constructor which uses MarschnerHairBsdf and -Shader
-	mat->m_diffuse.value = KIRK::Color::RGBA(0.43f, 0.353f, 0.2f, 1.0f);//Brown color 0.43f, 0.353f, 0.2f. Sigma_value for blond hair: 0.21f, 0.34f, 0.98f
-	mat->m_ior = 1.55f;//suggested value from marschner hair paper
-	mat->m_reflectivity.value = 1.f;
-	m_materials.push_back(mat);
 
 	//Iterate over every cone in the fur fiber
 	for (int c = 0; c < fiber.fiber_positions.size() - 1; c++)
@@ -318,7 +311,6 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 					m_uvs[offset + i + resolution + 1],
 					m_uvs[offset + i],
 					m_uvs[offset + i + 1]);
-				tri1->setMaterial(mat.get());
 				tri1->setU(m_u);
 				tri1->setV(m_v);
 				tri1->setW(m_w);
@@ -334,7 +326,6 @@ std::vector<KIRK::Triangle *> KIRK::CPU::Scene::fiberToTriangles(KIRK::Mesh::fur
 					m_uvs[offset + i + 1],
 					m_uvs[offset + i + resolution + 1 + 1],
 					m_uvs[offset + i + resolution + 1]);
-				tri2->setMaterial(mat.get());
 				tri2->setU(m_u);
 				tri2->setV(m_v);
 				tri2->setW(m_w);

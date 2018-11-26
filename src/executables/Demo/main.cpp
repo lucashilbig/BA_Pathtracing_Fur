@@ -163,7 +163,6 @@ void charCallback(GLFWwindow *window, unsigned int key)
 		{
 			LOG_INFO("\n Rendering new Image \n -------------------");
 			m_is_raytracer_active = true;
-			m_rendertime = 0;
 			m_show_rendertime = true;
 		}
 		else
@@ -181,6 +180,7 @@ void charCallback(GLFWwindow *window, unsigned int key)
 		LOG_INFO("Stopped Rendering");
 		LOG_INFO("Total render time after % Samples: % ms", cpu_pathtracer->getCurrentSampleCount(), m_rendertime);
 		m_rendertime = 0;
+		m_show_rendertime = false;
 		break;
 	case '0'://switch to OpenGL mode
 		m_platform_used = 0;
@@ -219,8 +219,10 @@ int main(int argc, char *argv[])
 	//Loading arguments is just as easy as to have a key char and a default value for when the argument is not set.
 	//CAUTION: Cannot use any const here. So no const char* allowed.
 	//Not important to have optimized const char*'s here for appending RESOURCES_PATH, all this is kind of temporary.
-	std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/scene.json"));
+	//std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/scene.json"));
+	std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_FinalResults/scene.json"));
 	//std::string file = std::string(SCENES_PATH) + arg_map.get('r', std::string("/Bunny/scene.json"));
+
 	std::string relative_path = arg_map.get('s', std::string(""));
 	unsigned int image_width = arg_map.get('w', 1280);
 	unsigned int image_height = arg_map.get('h', 720);
@@ -244,7 +246,7 @@ int main(int argc, char *argv[])
 		RESOURCES_PATH "/cubeMap/negz.jpg");*/
 
 	//save scene to json file
-	//jsonio::writeScene(scene, std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_SmallSkinPatch/")));
+	//jsonio::writeScene(scene, std::string(SCENES_PATH) + arg_map.get('r', std::string("/Fur_FinalResults/")));
 
 	//Apply fur on every triangle in the scene. For testing purpose.
 	
@@ -279,7 +281,7 @@ int main(int argc, char *argv[])
 	//////////////////////////////////////////////
 
 	//Initialize the cpu_scene with BVH Datastructure
-	auto cpu_scene = std::make_shared<KIRK::CPU::Scene>(scene, std::unique_ptr<KIRK::CPU::CPU_DataStructure>(std::make_unique<KIRK::CPU::BVH>()), true);
+	auto cpu_scene = std::make_shared<KIRK::CPU::Scene>(scene, std::unique_ptr<KIRK::CPU::CPU_DataStructure>(std::make_unique<KIRK::CPU::BVH>()), false);
 	
 	//Initialize the CPU raytracers
 	cpu_raytracer->init(cpu_scene);
@@ -503,8 +505,10 @@ int main(int argc, char *argv[])
 		{
 			glm::vec3 cam_pos = cpu_scene->getActiveCamera().getPosition();
 			glm::vec3 cam_dir = cpu_scene->getActiveCamera().getLookAt();
+			glm::vec3 cam_up = cpu_scene->getActiveCamera().getUp();
 			LOG_INFO("Total render time after % Samples: % ms", cpu_pathtracer->getCurrentSampleCount(), m_rendertime);
-			LOG_INFO("Kamera Position: (% , % , %) Look-At: (% , % , %)", cam_pos.x, cam_pos.y, cam_pos.z, cam_dir.x, cam_dir.y, cam_dir.z);
+			LOG_INFO("Kamera Position: (% , % , %) Look-At: (% , % , %) Up: (% , % , %)", cam_pos.x, cam_pos.y, cam_pos.z, cam_dir.x, cam_dir.y, cam_dir.z,
+				cam_up.x, cam_up.y, cam_up.z);
 			m_show_rendertime = false;
 		}
 

@@ -36,7 +36,7 @@ namespace KIRK {
 		//Diameter of the fiber
 		float fiber_width;
 
-		//if we have no cylinder as Object we return
+		//if we have no cylinder as Object we set fiber width to 100
 		if (cylinder_obj == NULL)
 			fiber_width = 100.f;
 		else

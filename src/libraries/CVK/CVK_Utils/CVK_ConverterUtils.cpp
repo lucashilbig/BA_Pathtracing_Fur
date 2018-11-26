@@ -291,10 +291,17 @@ namespace CVK
 						glm::vec3 basepos = mesh.m_furFibers[0].fiber_positions[j];
 						glm::vec3 apexpos = mesh.m_furFibers[0].fiber_positions[j + 1];
 						float baseradius = mesh.m_furFibers[0].fiber_radius[j];
+
+						////move base position a bit to hide cone edges in the fiber struct
+						//basepos -= 0.008f * (apexpos - basepos);
+						////lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
+						//baseradius -= (j > 3) ? 0.1f * baseradius : 0.05f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
+
 						//move base position a bit to hide cone edges in the fiber struct
-						basepos -= 0.008f * (apexpos - basepos);
+						basepos -= 0.001f * (apexpos - basepos);
 						//lower base radius a bit so it doesnt stick out of the previous cylinder of the fiber						
-						baseradius -= (j > 3) ? 0.1f * baseradius : 0.05f * baseradius;//higher multiplier at the top of the fiber, because the values are smaller there
+						baseradius -= 0.02f * baseradius;
+
 						//create CVK::Cone geometry with fiber_positions and fiber_radius
 						std::shared_ptr<CVK::Cone> fur_geometry = std::make_shared<CVK::Cone>(basepos, apexpos,
 							baseradius, mesh.m_furFibers[0].fiber_radius[j + 1], 5);
@@ -317,11 +324,8 @@ namespace CVK
 						glm::vec3 trans_vec = mesh.m_furFibers[i].fiber_positions[0] - mesh.m_furFibers[0].fiber_positions[0];
 
 						//Now calculate the actual transformation matrix with the meshes matrix as base and our translation vector on top of that
-						glm::mat4 trans_mat = glm::translate(transform, trans_vec);
-
-						//Scale down to comprehend big cylinder radius(needed cause they dont work properly with radius < 0.1)
-						// trans_mat *= glm::scale(glm::vec3(0.05f, 0.05f, 0.05f));
-						
+						glm::mat4 trans_mat =  glm::translate(transform, trans_vec);			
+												
 						//set transformation matrix for current fiber
 						fiber_inst_node->setModelMatrix(trans_mat);
 						//Push node to all other scene nodes
